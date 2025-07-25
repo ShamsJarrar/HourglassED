@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import Depends
 from dependencies import get_db
+from init_db import create_tables
+
+create_tables()
 
 app = FastAPI()
 
@@ -11,7 +14,7 @@ app = FastAPI()
 def root():
     return {"message":"HourglassEd API test"}
 
-## database connection test
+# database connection test
 @app.get("/db-test")
 def test_db(db: Session = Depends(get_db)):
     try:

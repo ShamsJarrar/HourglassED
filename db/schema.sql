@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (  user_id INT AUTO_INCREMENT PRIMARY KEY,     
 
 CREATE TABLE IF NOT EXISTS event_classes (  class_id INT AUTO_INCREMENT PRIMARY KEY,     class_name VARCHAR(255) NOT NULL UNIQUE,     is_builtin BOOLEAN DEFAULT FALSE);
 
-CREATE TABLE IF NOT EXISTS events (  event_id INT AUTO_INCREMENT PRIMARY KEY,     event_type INT,     header VARCHAR(255),     title VARCHAR(255),     start_time DATETIME NOT NULL,     end_time DATETIME NOT NULL,     recurrence_pattern VARCHAR(255),     color VARCHAR(20),     notes TEXT,     linked_event_id INT,     user_id INT NOT NULL,     FOREIGN KEY (event_type) REFERENCES event_classes(class_id) ON DELETE SET NULL,     FOREIGN KEY (linked_event_id) REFERENCES events(event_id) ON DELETE SET NULL,     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE );
+CREATE TABLE IF NOT EXISTS events (  event_id INT AUTO_INCREMENT PRIMARY KEY,     event_type INT NOT NULL,     header VARCHAR(255),     title VARCHAR(255),     start_time DATETIME NOT NULL,     end_time DATETIME NOT NULL,     recurrence_pattern VARCHAR(255),     color VARCHAR(20) DEFAULT '#4A90E2,     notes TEXT,     linked_event_id INT,     user_id INT NOT NULL,     FOREIGN KEY (event_type) REFERENCES event_classes(class_id) ON DELETE SET RESTRICT,     FOREIGN KEY (linked_event_id) REFERENCES events(event_id) ON DELETE SET NULL,     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE );
 
 CREATE TABLE IF NOT EXISTS shared_events (  id INT AUTO_INCREMENT PRIMARY KEY,     event_id INT NOT NULL,     user_id INT NOT NULL,     FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE );
 
