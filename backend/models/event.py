@@ -8,7 +8,7 @@ class Event(Base):
     event_id = Column(Integer, primary_key=True)
     event_type = Column(Integer, ForeignKey("event_classes.class_id", ondelete="RESTRICT"), nullable=False)
     header = Column(String(255))
-    title = Column(String(255))
+    title = Column(String(255), nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     recurrence_pattern = Column(String(255))
