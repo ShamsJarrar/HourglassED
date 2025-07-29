@@ -39,3 +39,32 @@ CREATE TABLE IF NOT EXISTS shared_events (
   FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
   FOREIGN KEY (shared_with_user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS friend_requests (
+  request_id INT AUTO_INCREMENT PRIMARY KEY,
+  sender_id INT NOT NULL,
+  receiver_id INT NOT NULL,
+  status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (receiver_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS friends (
+  user_id INT NOT NULL,
+  friend_id INT NOT NULL,
+  PRIMARY KEY (user_id, friend_id),
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  FOREIGN KEY (friend_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS event_invitations (
+  invitation_id INT AUTO_INCREMENT PRIMARY KEY,
+  event_id INT NOT NULL,
+  invited_user_id INT NOT NULL,
+  status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+  FOREIGN KEY (invited_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+

@@ -5,7 +5,7 @@ from database import Base
 class Event(Base):
     __tablename__ = "events"
     
-    event_id = Column(Integer, primary_key=True)
+    event_id = Column(Integer, primary_key=True, index=True)
     event_type = Column(Integer, ForeignKey("event_classes.class_id", ondelete="RESTRICT"), nullable=False)
     header = Column(String(255))
     title = Column(String(255), nullable=False)

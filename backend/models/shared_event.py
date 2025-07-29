@@ -5,7 +5,7 @@ from database import Base
 class SharedEvent(Base):
     __tablename__ = "shared_events"
 
-    shared_event_id = Column(Integer, primary_key=True)
+    shared_event_id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, ForeignKey("events.event_id", ondelete="CASCADE"), nullable=False)
     shared_with_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
