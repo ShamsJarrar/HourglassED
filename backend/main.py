@@ -4,13 +4,14 @@ from sqlalchemy import text
 from fastapi import Depends
 from dependencies import get_db
 from init_db import create_tables
-from routers import auth
+from routers import auth, friends
 
 
 create_tables()
 
 app = FastAPI()
 app.include_router(auth.router)
+app.include_router(friends.router)
 
 # API test
 @app.get("/")

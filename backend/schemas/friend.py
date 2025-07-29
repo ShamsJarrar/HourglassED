@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class Friend(BaseModel):
+class FriendResponse(BaseModel):
     user_id: int
     friend_id: int
 
