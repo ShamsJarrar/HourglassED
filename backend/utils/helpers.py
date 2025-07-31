@@ -1,3 +1,3 @@
 
-def normalize_email(email: str) -> str:
-    return email.strip().lower()
+def normalize_string(txt: str) -> str:
+    return txt.strip().lower()

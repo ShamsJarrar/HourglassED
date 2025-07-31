@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user
-from utils.helpers import normalize_email
+from utils.helpers import normalize_string
 from schemas.friend_request import FriendRequestCreate, FriendRequestResponse
 from schemas.friend import FriendResponse
 from models.friend_request import FriendRequest, FriendRequestStatus
@@ -21,7 +21,7 @@ def send_friend_request(
     cur_user: User = Depends(get_current_user)
 ):
     
-    receiver_email = normalize_email(req.receiver_email)
+    receiver_email = normalize_string(req.receiver_email)
     if receiver_email == cur_user.email:
         raise HTTPException(status_code=400, detail="Cannot friend request yourself")
     

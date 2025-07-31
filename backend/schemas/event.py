@@ -4,7 +4,7 @@ from typing import Optional
 
 
 class EventCreate(BaseModel):
-    event_type: int
+    event_type: str
     header: Optional[str] = None
     title: str
     start_time: datetime
@@ -18,13 +18,14 @@ class EventCreate(BaseModel):
 class EventResponse(EventCreate):
     event_id: int
     user_id: int
+    event_type: int
 
     class Config:
         from_attributes = True
     
 
 class EventUpdate(BaseModel):
-    event_type: Optional[int] = None
+    event_type: Optional[str] = None
     header: Optional[str] = None
     title: Optional[str] = None
     start_time: Optional[datetime] = None

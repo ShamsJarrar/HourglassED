@@ -11,9 +11,13 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS event_classes (
   class_id INT AUTO_INCREMENT PRIMARY KEY,
-  class_name VARCHAR(255) NOT NULL UNIQUE,
-  is_builtin BOOLEAN DEFAULT FALSE
+  class_name VARCHAR(255) NOT NULL,
+  is_builtin BOOLEAN DEFAULT FALSE,
+  created_by INT DEFAULT NULL,
+  FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+  UNIQUE (class_name, created_by)
 );
+
 
 CREATE TABLE IF NOT EXISTS events (
   event_id INT AUTO_INCREMENT PRIMARY KEY,

@@ -5,7 +5,7 @@ from schemas.user import UserCreate, UserLogin, UserResponse
 from schemas.token import TokenWithUserResponse
 from dependencies import get_db
 from utils.security import hash_password, verify_password, create_access_token, create_email_verification_token, send_verification_email, decode_access_token
-from utils.helpers import normalize_email
+from utils.helpers import normalize_string
 from jose import JWTError, jwt
 from pydantic import EmailStr
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix='/auth', tags=["Auth"])
 @router.post('/register', response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
 
-    email = normalize_email(user.email)
+    email = normalize_string(user.email)
     exists = db.query(User).filter(User.email == email).first()
     if exists:
         raise HTTPException(status_code=400, detail="Email registered already")
@@ -35,7 +35,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @router.post('/login', response_model=TokenWithUserResponse)
 def login(info: UserLogin, db: Session = Depends(get_db)):
 
-    email = normalize_email(info.email)
+    email = normalize_string(info.email)
     user = db.query(User).filter(User.email == email).first()
     if user is None or not verify_password(info.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -69,7 +69,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
 @router.post('/resend-verification')
 def resend_verfication(email: EmailStr, db: Session = Depends(get_db)):
-    email = normalize_email(email)
+    email = normalize_string(email)
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Email not registered.")
