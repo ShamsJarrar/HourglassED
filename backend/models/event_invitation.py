@@ -19,4 +19,4 @@ class EventInvitation(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     invited_user = relationship("User")
-    event = relationship("Event")
+    event = relationship("Event", backref = 'invitations', foreign_keys=[event_id])

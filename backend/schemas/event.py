@@ -34,3 +34,19 @@ class EventUpdate(BaseModel):
     color: Optional[str] = None
     notes: Optional[str] = None
     linked_event_id: Optional[int] = None
+
+
+class EventOwnerEmail(BaseModel):
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
+class EventResponseWithOwnerEmail(EventCreate):
+    event_id: int
+    event_type: int
+    user: EventOwnerEmail
+
+    class Config:
+        from_attributes = True

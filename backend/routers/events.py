@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from dependencies import get_current_user, get_db
-from utils.helpers import normalize_string
+from utils.helpers import get_event_class
 from models.user import User
-from models.event_class import EventClass
 from models.event import Event
-from models.event_invitation import EventInvitation
+from models.event_invitation import EventInvitation, EventInvitationStatus
+from models.friend import Friend
 from schemas.event import EventCreate, EventResponse, EventUpdate
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 
 
 router = APIRouter(prefix='/event', tags=['Event'])
@@ -20,39 +21,11 @@ def create_event(
     user: User = Depends(get_current_user)
 ):
 
-    event_class_name = normalize_string(event_info.event_type)
-
-    # check if event class is builtin
-    event_class = db.query(EventClass).filter(
-        EventClass.class_name == event_class_name,
-        EventClass.is_builtin == True
-    ).first()
-
-    # if not built in, then check if custom class
-    # is already added by the user or not
-    if not event_class:
-        event_class = db.query(EventClass).filter(
-            EventClass.class_name == event_class_name,
-            EventClass.created_by == user.user_id
-        ).first()
-    
-
-    # if event_class still not found, add it to db
-    if not event_class:
-        event_class = EventClass(
-            class_name = event_class_name,
-            created_by = user.user_id,
-            is_builtin = False
-        )
-        db.add(event_class)
-        db.commit()
-        db.refresh(event_class)
-
+    event_class = get_event_class(event_info.event_type, db, user)
 
     if event_info.start_time >= event_info.end_time:
         raise HTTPException(status_code=400, 
                             detail="start_time must be before end_time")
-
     
     new_event = Event(
         event_type = event_class.class_id,
@@ -73,21 +46,130 @@ def create_event(
     return new_event
 
 
+
 @router.get('/', response_model=List[EventResponse])
-def get_all_events(
+def get_user_events(
+    start_time: Optional[datetime] = Query(None),
+    end_time: Optional[datetime] = Query(None),
+    event_type: Optional[int] = Query(None),
+    owned_only: Optional[bool] = Query(False),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     
-    user_events = db.query(Event).filter(
-        Event.user_id == user.user_id
-    ).all()
+    filters = []
+
+    if start_time is not None:
+        filters.append(Event.start_time >= start_time)
+    if end_time is not None:
+        filters.append(Event.end_time <= end_time)
+    if event_type is not None:
+        filters.append(Event.event_type == event_type)
 
     
-    # TODO: query shared events with user from event invitations
-    # TODO: drop shared events table due to redudancy
-    # TODO: add querying filters like (event_type, date range), etc
+    user_events = db.query(Event).filter(
+        Event.user_id == user.user_id,
+        *filters
+    ).all()
 
-    return user_events
+    shared_event_ids = db.query(EventInvitation.event_id).filter(
+        EventInvitation.invited_user_id == user.user_id,
+        EventInvitation.status == EventInvitationStatus.accepted
+    ).subquery()
+
+    shared_events = db.query(Event).filter(
+        Event.event_id.in_(shared_event_ids),
+        *filters
+    ).all()
+    
+
+    if owned_only:
+        return user_events
+    return user_events + shared_events
 
 
+
+@router.get('/{event_id}', response_model=EventResponse)
+def get_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    event = db.query(Event).filter(
+        Event.event_id == event_id
+    ).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event does not exist")
+    
+    if event.user_id == user.user_id:
+        return event
+    
+
+    is_shared_event = db.query(EventInvitation).filter(
+        EventInvitation.event_id == event_id,
+        EventInvitation.invited_user_id == user.user_id,
+        EventInvitation.status == EventInvitationStatus.accepted
+    ).first()
+
+    if not is_shared_event:
+        raise HTTPException(status_code=403, detail="You are not authorized to access this event")
+    
+    return event
+
+
+
+@router.put('/{event_id}', response_model=EventResponse)
+def update_event(
+    event_id: int,
+    updated_info: EventUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    event = db.query(Event).filter(Event.event_id == event_id).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event does not exist")
+    
+    if event.user_id != user.user_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to edit this event")
+    
+    if updated_info.event_type is not None:
+        event_class = get_event_class(updated_info.event_type, db, user)
+        event.event_type = event_class.class_id
+    
+    for field in ["header", "title", "start_time", "end_time", "recurrence_pattern", "color", "notes", "linked_event_id"]:
+        value = getattr(updated_info, field)
+        if value is not None:
+            setattr(event, field, value)
+
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+
+@router.delete('/{event_id}', status_code=204)
+def delete_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    event = db.query(Event).filter(Event.event_id == event_id).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event does not exist")
+    
+    if event.user_id != user.user_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to delete this event")
+    
+    db.delete(event)
+    db.commit()
+    return Response(status_code=204)
+
+
+# TODO: add router to main and test it
+# TODO: add notifications?

@@ -36,13 +36,6 @@ CREATE TABLE IF NOT EXISTS events (
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS shared_events (
-  shared_event_id INT AUTO_INCREMENT PRIMARY KEY,
-  event_id INT NOT NULL,
-  shared_with_user_id INT NOT NULL,
-  FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
-  FOREIGN KEY (shared_with_user_id) REFERENCES users(user_id) ON DELETE CASCADE
-);
 
 CREATE TABLE IF NOT EXISTS friend_requests (
   request_id INT AUTO_INCREMENT PRIMARY KEY,

@@ -160,3 +160,5 @@ def view_friends(
 
 
 # TODO: Add unfriend functionality
+# TODO: Delete request if still pending
+# TODO: Add notifications?
