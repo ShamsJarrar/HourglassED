@@ -15,7 +15,7 @@ def get_db():
     finally:
         db.close()
 
-
+# TODO: uncomment when testing is done
 # oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # for testing using swagger, adding a temp endpoint to send token manually

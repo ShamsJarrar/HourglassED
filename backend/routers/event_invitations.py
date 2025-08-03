@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.orm import Session
 from dependencies import get_current_user, get_db
 from models.user import User
@@ -6,7 +6,7 @@ from models.event import Event
 from models.event_invitation import EventInvitation, EventInvitationStatus
 from models.friend import Friend
 from schemas.event_invitation import EventInvitationCreate, EventInvitationResponse, EventInvitationResponseUpdate, EventInvitationWithEvent
-from typing import List
+from typing import List, Optional
 
 
 router = APIRouter(prefix='/invitations', tags=['Event invitations'])
@@ -97,7 +97,7 @@ def get_received_invites(
     user: User = Depends(get_current_user)
 ):
     
-    invites = db.query(EventInvitation).join(Event).join(User).filter(
+    invites = db.query(EventInvitation).join(Event).join(User, Event.user).filter(
         EventInvitation.invited_user_id == user.user_id,
         EventInvitation.status == EventInvitationStatus.pending
     ).all()
@@ -105,23 +105,58 @@ def get_received_invites(
     return invites
 
 
-# To edit
+
 @router.get('/sent', response_model=List[EventInvitationWithEvent])
 def get_sent_invites(
+    event_id: Optional[int] = Query(None),
+    status: Optional[EventInvitationStatus] = Query(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     
-    invites = db.query(EventInvitation).join(Event).join(User).filter(
+    query = db.query(EventInvitation).join(Event).join(User, EventInvitation.invited_user).filter(
         Event.user_id == user.user_id
-    ).all()
+    )
 
-    return invites
+    if event_id:
+        query = query.filter(EventInvitation.event_id == event_id)
 
-# TODO: add status filters and show invited user's email to get_sent_invites
-# TODO: add delete invitation (pending)
-#       -> figure out if user can remove other users from event
-#       -> if invited user can exit event
+    if status:
+        query = query.filter(EventInvitation.status == status)
+    
+    return query.all()
 
-# TODO: add notifications
-# TODO: add router to main and test functionality
+
+
+@router.delete('/{invitation_id}', status_code=status.HTTP_204_NO_CONTENT)
+def cancel_invitation(
+    invitation_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    invitation = db.query(EventInvitation).filter(
+        EventInvitation.invitation_id == invitation_id,
+    ).first()
+
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invitation does not exist")
+    
+    if invitation.status != EventInvitationStatus.pending:
+        raise HTTPException(status_code=400, detail="Invite already accepted, cannot delete")
+    
+
+    event = db.query(Event).filter(
+        Event.event_id == invitation.event_id
+    ).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    if event.user_id != user.user_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to delete this invite")
+    
+    
+    db.delete(invitation)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

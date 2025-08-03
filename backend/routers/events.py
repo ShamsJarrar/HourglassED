@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 from dependencies import get_current_user, get_db
 from utils.helpers import get_event_class
@@ -145,13 +145,14 @@ def update_event(
         if value is not None:
             setattr(event, field, value)
 
+
     db.commit()
     db.refresh(event)
     return event
 
 
 
-@router.delete('/{event_id}', status_code=204)
+@router.delete('/{event_id}', status_code=status.HTTP_204_NO_CONTENT)
 def delete_event(
     event_id: int,
     db: Session = Depends(get_db),
@@ -166,10 +167,67 @@ def delete_event(
     if event.user_id != user.user_id:
         raise HTTPException(status_code=403, detail="You are not authorized to delete this event")
     
+
     db.delete(event)
     db.commit()
-    return Response(status_code=204)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# TODO: add router to main and test it
-# TODO: add notifications?
+# frontend calls get all sent invites to get invited_user_id
+@router.delete('/{event_id}/remove/{invited_user_id}', status_code=status.HTTP_204_NO_CONTENT)
+def remove_user_from_event(
+    event_id: int,
+    invited_user_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    event = db.query(Event).filter(
+        Event.event_id == event_id
+    ).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event does not exist")
+    
+    if event.user_id != user.user_id:
+        raise HTTPException(status_code=403, detail="You are not allowed to access this event")
+    
+
+    invite = db.query(EventInvitation).filter(
+        EventInvitation.event_id == event_id,
+        EventInvitation.invited_user_id == invited_user_id,
+        EventInvitation.status == EventInvitationStatus.accepted
+    ).first()
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="Event not shared with user or user did not accept invite")
+    
+
+    db.delete(invite)
+    db.commit()
+    print(f"[INFO] User {user.user_id} removed user {invited_user_id} from event {event_id}")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+
+@router.delete('/{event_id}/withdraw', status_code=status.HTTP_204_NO_CONTENT)
+def withdraw_from_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    invite = db.query(EventInvitation).filter(
+        EventInvitation.event_id == event_id,
+        EventInvitation.invited_user_id == user.user_id,
+        EventInvitation.status == EventInvitationStatus.accepted
+    ).first()
+
+    if not invite:
+        raise HTTPException(status_code=404, detail="You do not have an accepted invitation for this event")
+
+
+    db.delete(invite)
+    db.commit()
+    print(f"[INFO] User {user.user_id} withdrew from event {event_id}")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

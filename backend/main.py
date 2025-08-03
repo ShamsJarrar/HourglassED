@@ -4,7 +4,7 @@ from sqlalchemy import text
 from fastapi import Depends
 from dependencies import get_db
 from init_db import create_tables
-from routers import auth, friends
+from routers import auth, friends, events, event_invitations
 
 
 create_tables()
@@ -12,6 +12,9 @@ create_tables()
 app = FastAPI()
 app.include_router(auth.router)
 app.include_router(friends.router)
+app.include_router(events.router)
+app.include_router(event_invitations.router)
+
 
 # API test
 @app.get("/")
@@ -26,3 +29,8 @@ def root():
 #         return {"status" : "success"}
 #     except Exception as e:
 #         return {"status": "error", "detail": str(e)}
+
+
+# TODO: test all routers
+# TODO: add notifications
+# TODO: add logging
