@@ -7,6 +7,9 @@ class EventInvitationStatus(str, enum.Enum):
     pending = "pending"
     accepted = "accepted"
     rejected = "rejected"
+    withdrawn = "withdrawn"
+    removed = "removed"
+    expired = "expired"
 
 
 class EventInvitation(Base):
@@ -15,7 +18,7 @@ class EventInvitation(Base):
     invitation_id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, ForeignKey("events.event_id", ondelete="CASCADE"), nullable=False)
     invited_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    status = Column(Enum(EventInvitationStatus), default=EventInvitationStatus.pending)
+    status = Column(Enum(EventInvitationStatus), default=EventInvitationStatus.pending, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     invited_user = relationship("User")

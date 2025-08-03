@@ -168,8 +168,21 @@ def delete_event(
         raise HTTPException(status_code=403, detail="You are not authorized to delete this event")
     
 
+    invitations_to_event = db.query(EventInvitation).filter(
+        EventInvitation.event_id == event_id,
+        EventInvitation.status.in_([
+            EventInvitationStatus.pending,
+            EventInvitationStatus.accepted
+        ])
+    ).all()
+
+    for invite in invitations_to_event:
+        invite.status = EventInvitationStatus.expired
+    
+
     db.delete(event)
     db.commit()
+    print(f"[INFO] User {user.user_id} deleted event {event_id}, marking {len(invitations_to_event)} invitations as expired")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -203,7 +216,7 @@ def remove_user_from_event(
         raise HTTPException(status_code=404, detail="Event not shared with user or user did not accept invite")
     
 
-    db.delete(invite)
+    invite.status = EventInvitationStatus.removed
     db.commit()
     print(f"[INFO] User {user.user_id} removed user {invited_user_id} from event {event_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -227,7 +240,7 @@ def withdraw_from_event(
         raise HTTPException(status_code=404, detail="You do not have an accepted invitation for this event")
 
 
-    db.delete(invite)
+    invite.status = EventInvitationStatus.withdrawn
     db.commit()
     print(f"[INFO] User {user.user_id} withdrew from event {event_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

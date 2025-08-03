@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS event_invitations (
   invitation_id INT AUTO_INCREMENT PRIMARY KEY,
   event_id INT NOT NULL,
   invited_user_id INT NOT NULL,
-  status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
+  status ENUM('pending', 'accepted', 'rejected', 'withdrawn', 'removed', 'expired') NOT NULL DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
   FOREIGN KEY (invited_user_id) REFERENCES users(user_id) ON DELETE CASCADE
