@@ -160,3 +160,7 @@ def cancel_invitation(
     db.delete(invitation)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+
+# TODO: add event_invitations status withdrawn, removed, expired

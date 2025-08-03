@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user
 from utils.helpers import normalize_string
@@ -157,6 +157,63 @@ def view_friends(
         Friend.user_id == cur_user.user_id,
     ).all()
     return friends
+
+
+# request sender can unsend request if it is still pending
+@router.delete('/friend-request/{request_id}/unsend', status_code=status.HTTP_204_NO_CONTENT)
+def unsend_friend_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    friend_request = db.query(FriendRequest).filter(
+        FriendRequest.request_id == request_id
+    ).first()
+
+    if not friend_request:
+        raise HTTPException(status_code=404, detail="Friend request does not exist")
+    
+    if friend_request.sender_id != user.user_id:
+        raise HTTPException(status_code=403, detail="You are not authorized to delete this friend request")
+    
+    if friend_request.status != FriendRequestStatus.pending:
+        raise HTTPException(status_code=400, detail="Friend request already accepted/rejected")
+    
+
+    db.delete(friend_request)
+    db.commit()
+    print(f"[INFO] User {user.user_id} unsent friend request to {friend_request.receiver_id}")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete('/unfriend/{friend_id}', status_code=status.HTTP_204_NO_CONTENT)
+def unfriend(
+    friend_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    friendship = db.query(Friend).filter(
+        Friend.friend_id == friend_id,
+        Friend.user_id == user.user_id
+    ).first()
+
+    recursive_friendship = db.query(Friend).filter(
+        Friend.friend_id == user.user_id,
+        Friend.user_id == friend_id
+    ).first()
+
+    if not friendship or not recursive_friendship:
+        raise HTTPException(status_code=404, detail="Friendship does not exist")
+    
+
+    db.delete(friendship)
+    db.delete(recursive_friendship)
+    db.commit()
+    print(f"[INFO] User {user.user_id} unfriended {friend_id}")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 
 # TODO: Add unfriend functionality
