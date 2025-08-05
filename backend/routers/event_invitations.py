@@ -67,13 +67,13 @@ def invite_user_to_event(
 
 @router.post('/respond', response_model=EventInvitationResponse)
 def respond_to_event_invite(
-    response: EventInvitationResponseUpdate,
+    answer: EventInvitationResponseUpdate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     
     event_invite = db.query(EventInvitation).filter(
-        EventInvitation.invitation_id == response.invitation_id
+        EventInvitation.invitation_id == answer.invitation_id
     ).first()
 
     if not event_invite:
@@ -83,9 +83,14 @@ def respond_to_event_invite(
         raise HTTPException(status_code=403, detail="You are not authorized to access this invitation")
     
     if event_invite.status != EventInvitationStatus.pending:
-        raise HTTPException(status_code=400, detail="Invite already accepted/rejected")
+        raise HTTPException(status_code=400, detail="Invite already accepted/rejected/withdrawn/expired")
     
-    event_invite.status = response.status
+    if (answer.response != EventInvitationStatus.accepted) and\
+        (answer.response != EventInvitationStatus.rejected):
+        raise HTTPException(status_code=400, detail="Can only accept or reject invite")
+
+
+    event_invite.status = answer.response
     db.commit()
     db.refresh(event_invite)
     return event_invite
@@ -94,17 +99,14 @@ def respond_to_event_invite(
 
 @router.get('/received', response_model=List[EventInvitationWithEvent])
 def get_received_invites(
-    status: Optional[EventInvitationStatus] = Query(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
     
     query = db.query(EventInvitation).join(Event).join(User, Event.user).filter(
-        EventInvitation.invited_user_id == user.user_id
+        EventInvitation.invited_user_id == user.user_id,
+        EventInvitation.status == EventInvitationStatus.pending
     )
-
-    if status:
-        query = query.filter(EventInvitation.status == status)
 
     return query.all()
 
