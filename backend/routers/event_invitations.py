@@ -7,8 +7,8 @@ from models.event_invitation import EventInvitation, EventInvitationStatus
 from models.friend import Friend
 from schemas.event_invitation import EventInvitationCreate, EventInvitationResponse, EventInvitationResponseUpdate, EventInvitationWithEvent
 from typing import List, Optional
-from datetime import datetime
 from logger import logger
+from tasks import expire_passed_invitations
 
 
 router = APIRouter(prefix='/invitations', tags=['Event invitations'])
@@ -188,33 +188,8 @@ def cancel_invitation(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# TODO: uncomment code and test it and add cron job
-# if an event passed, then the invitation expires
-# @router.post('/expire', status_code=status.HTTP_200_OK)
-# def expire_passed_invitations(
-#     db: Session = Depends(get_db),
-#     user: User = Depends(get_current_user)
-# ):
-    
-#     now = datetime.now()
-
-#     expired_event_ids = db.query(Event.event_id).filter(
-#         Event.user_id == user.user_id,
-#         Event.end_time < now
-#     ).subquery()
-
-#     invitations = db.query(EventInvitation).filter(
-#         EventInvitation.event_id.in_(expired_event_ids),
-#         EventInvitation.status.in_([
-#             EventInvitationStatus.pending,
-#             EventInvitationStatus.accepted
-#         ])
-#     ).all()
-
-#     cnt = 0
-#     for invite in invitations:
-#         invite.status = EventInvitationStatus.expired
-#         cnt += 1
-    
-#     db.commit()
-#     return {"message": f"{cnt} invitations are expired"}
+# endpoint for testing if celery works correctly
+@router.post("/expire-invitations-background")
+def trigger_expiration_task():
+    expire_passed_invitations.delay()
+    return {"message": "Event invitation expiration task triggered in background"}
