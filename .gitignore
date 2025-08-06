@@ -4,4 +4,6 @@ __pycache__/
 *.py[cod]
 /backend/.env
 /backend/logs/*.log
-
+celerybeat-schedule
+celerybeat-schedule-shm
+celerybeat-schedule-wal

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user
 from utils.helpers import normalize_string
+from utils.notifications import create_notification
 from schemas.friend_request import FriendRequestCreate, FriendRequestResponse
 from schemas.friend import FriendResponse
 from models.friend_request import FriendRequest, FriendRequestStatus
@@ -60,6 +61,18 @@ def send_friend_request(
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
+
+
+    try:
+        create_notification(
+            db = db,
+            user_id = receiver.user_id,
+            message = f"{cur_user.name} has sent you a friend request"
+        )
+    except Exception as e:
+        logger.error(f"Error while creating notification {e}")
+    
+
     logger.info(f"User {cur_user.user_id} sent friend request to {receiver.user_id}")
     return new_request
 
@@ -98,6 +111,17 @@ def accept_request(
         Friend(user_id=friend_req.receiver_id, friend_id=friend_req.sender_id)
     ])
     db.commit()
+
+
+    try:
+        create_notification(
+            db = db,
+            user_id = friend_req.sender_id,
+            message = f"{cur_user.name} has accepted your friend request"
+        )
+    except Exception as e:
+        logger.error(f"Error while creating notification {e}")
+
 
     logger.info(f"User {cur_user.user_id} accepted friend request {request_id} from {friend_req.sender_id}")
     return {"message":"Friend request accepted"}

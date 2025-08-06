@@ -4,7 +4,7 @@ from sqlalchemy import text
 from fastapi import Depends
 from dependencies import get_db
 from init_db import create_tables
-from routers import auth, friends, events, event_invitations
+from routers import auth, friends, events, event_invitations, notifications
 from logger import logger
 
 
@@ -15,6 +15,7 @@ app.include_router(auth.router)
 app.include_router(friends.router)
 app.include_router(events.router)
 app.include_router(event_invitations.router)
+app.include_router(notifications.router)
 
 
 logger.info("HourglassED API starting!")

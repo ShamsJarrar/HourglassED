@@ -6,6 +6,7 @@ from models.event import Event
 from models.event_invitation import EventInvitation, EventInvitationStatus
 from models.friend import Friend
 from schemas.event_invitation import EventInvitationCreate, EventInvitationResponse, EventInvitationResponseUpdate, EventInvitationWithEvent
+from utils.notifications import create_notification
 from typing import List, Optional
 from logger import logger
 from tasks import expire_passed_invitations
@@ -67,8 +68,21 @@ def invite_user_to_event(
     db.add(new_invitation)
     db.commit()
     db.refresh(new_invitation)
+
+
+    try:
+        create_notification(
+            db = db, 
+            user_id = event_invite.invited_user_id, 
+            message = f"You have been invited to {event.title} by {user.name}"
+        )
+    except Exception as e:
+        logger.error(f"Error while creating notification {e}")
+
+
     logger.info(f"User {user.user_id} invited user {event_invite.invited_user_id} to event {event_invite.event_id}")
     return new_invitation
+
 
 
 
@@ -104,8 +118,24 @@ def respond_to_event_invite(
     event_invite.status = answer.response
     db.commit()
     db.refresh(event_invite)
+
+
+    if answer.response == EventInvitationStatus.accepted:
+        event = db.query(Event).filter(Event.event_id == event_invite.event_id).first()
+
+        try:
+            create_notification(
+                db = db,
+                user_id = event.user_id,
+                message = f"{user.name} has accepted your invitation to {event.title}"
+            )
+        except Exception as e:
+            logger.error(f"Error while creating notification {e}")
+
+
     logger.info(f"User {user.user_id} responded to invitation {answer.invitation_id} with status {answer.response}")
     return event_invite
+
 
 
 
