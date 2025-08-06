@@ -9,10 +9,11 @@ from logger import logger
 
 
 # if an event passed, then the invitation expires
-@celery_app.task
+@celery_app.task(name="tasks.expire_passed_invitations")
 def expire_passed_invitations():
     db = SessionLocal()
-
+    logger.debug("[Celery Beat] expire_passed_invitations taks is being triggered")
+    
     try:
         now = datetime.now(UTC)
 

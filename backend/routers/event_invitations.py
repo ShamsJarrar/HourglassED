@@ -189,6 +189,7 @@ def cancel_invitation(
 
 
 # endpoint for testing if celery works correctly
+# can be commented when celery beat is used
 @router.post("/expire-invitations-background")
 def trigger_expiration_task():
     expire_passed_invitations.delay()

@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 
 celery_app = Celery(
@@ -8,3 +9,10 @@ celery_app = Celery(
 )
 
 celery_app.conf.timezone = "UTC"
+
+celery_app.conf.beat_schedule = {
+    "expire-invitations-every-hour": {
+        "task": "tasks.expire_passed_invitations",
+        "schedule": crontab(minute=0), 
+    },
+}
