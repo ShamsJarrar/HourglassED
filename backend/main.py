@@ -5,6 +5,7 @@ from fastapi import Depends
 from dependencies import get_db
 from init_db import create_tables
 from routers import auth, friends, events, event_invitations
+from logger import logger
 
 
 create_tables()
@@ -16,10 +17,14 @@ app.include_router(events.router)
 app.include_router(event_invitations.router)
 
 
+logger.info("HourglassED API starting!")
+
+
 # API test
 @app.get("/")
 def root():
     return {"message":"HourglassEd API test"}
+
 
 # database connection test
 # @app.get("/db-test")
@@ -31,6 +36,4 @@ def root():
 #         return {"status": "error", "detail": str(e)}
 
 
-# TODO: test all routers
 # TODO: add notifications
-# TODO: add logging

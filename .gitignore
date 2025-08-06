@@ -1,7 +1,7 @@
 # Backend
 /backend/venv/
-/backend/__pycache__/
-/backend/*.pyc
+__pycache__/
+*.py[cod]
 /backend/.env
-/backend/*.log
+/backend/logs/*.log
 

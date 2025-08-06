@@ -21,5 +21,5 @@ class EventInvitation(Base):
     status = Column(Enum(EventInvitationStatus), default=EventInvitationStatus.pending, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    invited_user = relationship("User")
-    event = relationship("Event", backref = 'invitations', foreign_keys=[event_id])
+    invited_user = relationship("User", passive_deletes=True)
+    event = relationship("Event", back_populates="invitations", foreign_keys=[event_id], passive_deletes=True)

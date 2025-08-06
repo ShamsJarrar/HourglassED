@@ -7,7 +7,7 @@ from schemas.friend import FriendResponse
 from models.friend_request import FriendRequest, FriendRequestStatus
 from models.user import User
 from models.friend import Friend
-from models.friend_request import FriendRequest
+from logger import logger
 
 
 router = APIRouter(prefix='/friends', tags=['Friends'])
@@ -23,11 +23,13 @@ def send_friend_request(
     
     receiver_email = normalize_string(req.receiver_email)
     if receiver_email == cur_user.email:
+        logger.warning(f"User {cur_user.user_id} tried to send a friend request to themselves")
         raise HTTPException(status_code=400, detail="Cannot friend request yourself")
     
 
     receiver = db.query(User).filter(User.email == receiver_email).first()
     if not receiver:
+        logger.warning(f"Receiver user is non-existent")
         raise HTTPException(status_code=404, detail="User not found")
     
 
@@ -37,6 +39,7 @@ def send_friend_request(
         Friend.user_id == cur_user.user_id
         ).first()
     if friendship_exists:
+        logger.warning(f"User {cur_user.user_id} tried to send friend request to a friend!")
         raise HTTPException(status_code=400, detail="Already friends")
     
 
@@ -46,6 +49,7 @@ def send_friend_request(
         ((FriendRequest.sender_id == receiver.user_id) & (FriendRequest.receiver_id == cur_user.user_id))
         ).first()
     if request_exists:
+        logger.warning(f"User {cur_user.user_id} already sent a friend request before")
         raise HTTPException(status_code=400, detail="Already requested")
     
 
@@ -56,6 +60,7 @@ def send_friend_request(
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
+    logger.info(f"User {cur_user.user_id} sent friend request to {receiver.user_id}")
     return new_request
 
 
@@ -71,12 +76,15 @@ def accept_request(
         FriendRequest.request_id == request_id
     ).first()
     if not friend_req:
+        logger.warning(f"User {cur_user.user_id} tried to accept a non-existent friend request")
         raise HTTPException(status_code=404, detail="Friend request does not exist")
     
     if friend_req.receiver_id != cur_user.user_id:
+        logger.warning(f"User {cur_user.user_id} is not authorized to access friend request {request_id}")
         raise HTTPException(status_code=403, detail="Unauthorized access")
     
     if friend_req.status != FriendRequestStatus.pending:
+        logger.warning(f"User {cur_user.user_id} tried to respond to an already accepted/rejected request")
         raise HTTPException(status_code=400, detail="Request already accepted/rejected")
 
 
@@ -91,6 +99,7 @@ def accept_request(
     ])
     db.commit()
 
+    logger.info(f"User {cur_user.user_id} accepted friend request {request_id} from {friend_req.sender_id}")
     return {"message":"Friend request accepted"}
 
 
@@ -106,18 +115,22 @@ def reject_request(
         FriendRequest.request_id == request_id
     ).first()
     if not friend_req:
+        logger.warning(f"User {cur_user.user_id} tried to reject a non-existent friend request")
         raise HTTPException(status_code=404, detail="Friend request does not exist")
     
     if friend_req.receiver_id != cur_user.user_id:
+        logger.warning(f"User {cur_user.user_id} is not authorized to access friend request {request_id}")
         raise HTTPException(status_code=403, detail="Unauthorized access")
     
     if friend_req.status != FriendRequestStatus.pending:
+        logger.warning(f"User {cur_user.user_id} tried to respond to an already accepted/rejected request")
         raise HTTPException(status_code=400, detail="Request already accepted/rejected")
 
 
     friend_req.status = FriendRequestStatus.rejected
     db.commit()
 
+    logger.info(f"User {cur_user.user_id} rejected friend request {request_id} from {friend_req.sender_id}")
     return {"message":"Friend request rejected"}
 
 
@@ -131,6 +144,7 @@ def received_requests(
         FriendRequest.receiver_id == cur_user.user_id,
         FriendRequest.status == FriendRequestStatus.pending
     ).all()
+    logger.debug(f"User {cur_user.user_id} fetched received friend requests")
     return friend_requests
 
 
@@ -144,6 +158,7 @@ def sent_requests(
         FriendRequest.sender_id == cur_user.user_id,
         FriendRequest.status == FriendRequestStatus.pending
     ).all()
+    logger.debug(f"User {cur_user.user_id} fetched sent friend requests")
     return friend_requests
 
 
@@ -156,6 +171,7 @@ def view_friends(
     friends = db.query(Friend).filter(
         Friend.user_id == cur_user.user_id,
     ).all()
+    logger.debug(f"User {cur_user.user_id} fetched friend list")
     return friends
 
 
@@ -172,18 +188,21 @@ def unsend_friend_request(
     ).first()
 
     if not friend_request:
+        logger.warning(f"User {user.user_id} tried to unsend a non-existent friend request")
         raise HTTPException(status_code=404, detail="Friend request does not exist")
     
     if friend_request.sender_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to access friend request {request_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to delete this friend request")
     
     if friend_request.status != FriendRequestStatus.pending:
+        logger.warning(f"User {user.user_id} tried to respond to an already accepted/rejected request")
         raise HTTPException(status_code=400, detail="Friend request already accepted/rejected")
     
 
     db.delete(friend_request)
     db.commit()
-    print(f"[INFO] User {user.user_id} unsent friend request to {friend_request.receiver_id}")
+    logger.info(f"User {user.user_id} unsent friend request to {friend_request.receiver_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -205,17 +224,13 @@ def unfriend(
     ).first()
 
     if not friendship or not recursive_friendship:
+        logger.warning(f"User {user.user_id} tried to unsend a non-existent friend request")
         raise HTTPException(status_code=404, detail="Friendship does not exist")
     
 
     db.delete(friendship)
     db.delete(recursive_friendship)
     db.commit()
-    print(f"[INFO] User {user.user_id} unfriended {friend_id}")
+    logger.info(f"User {user.user_id} unfriended {friend_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-
-
-# TODO: Add unfriend functionality
-# TODO: Delete request if still pending
-# TODO: Add notifications?

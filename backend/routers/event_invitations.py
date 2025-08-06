@@ -8,6 +8,7 @@ from models.friend import Friend
 from schemas.event_invitation import EventInvitationCreate, EventInvitationResponse, EventInvitationResponseUpdate, EventInvitationWithEvent
 from typing import List, Optional
 from datetime import datetime
+from logger import logger
 
 
 router = APIRouter(prefix='/invitations', tags=['Event invitations'])
@@ -23,14 +24,17 @@ def invite_user_to_event(
     event = db.query(Event).filter(Event.event_id == event_invite.event_id).first()
 
     if not event:
+        logger.warning(f"User {user.user_id} tried to access a non-existent event")
         raise HTTPException(status_code=404, detail="Event does not exist")
     
     # if the user does not own the event, they cannot invite others to it
     if event.user_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to invite to event {event_invite.event_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to access this event")
     
     # owner cannot invite themselves
     if event_invite.invited_user_id == user.user_id:
+        logger.warning(f"User {user.user_id} attempted to invite themselves to their own event")
         raise HTTPException(status_code=400, detail="You cannot invite yourself")
     
 
@@ -40,6 +44,7 @@ def invite_user_to_event(
     ).first()
 
     if not is_friend:
+        logger.warning(f"User {user.user_id} attempted to invite non-friend {event_invite.invited_user_id}")
         raise HTTPException(status_code=403, detail="Can only invite friends")
     
     
@@ -49,6 +54,7 @@ def invite_user_to_event(
     ).first()
 
     if exists:
+        logger.warning(f"User {user.user_id} tried to invite user {event_invite.invited_user_id} who is already invited")
         raise HTTPException(status_code=400, detail="User is already invited to this event")
     
 
@@ -61,6 +67,7 @@ def invite_user_to_event(
     db.add(new_invitation)
     db.commit()
     db.refresh(new_invitation)
+    logger.info(f"User {user.user_id} invited user {event_invite.invited_user_id} to event {event_invite.event_id}")
     return new_invitation
 
 
@@ -77,22 +84,27 @@ def respond_to_event_invite(
     ).first()
 
     if not event_invite:
+        logger.warning(f"User {user.user_id} tried to respond to non-existent invitation {answer.invitation_id}")
         raise HTTPException(status_code=404, detail="Invitation does not exist")
     
     if event_invite.invited_user_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to access this invitation")
         raise HTTPException(status_code=403, detail="You are not authorized to access this invitation")
     
     if event_invite.status != EventInvitationStatus.pending:
+        logger.warning(f"User {user.user_id} tried to respond to invitation {answer.invitation_id} with status {event_invite.status}")
         raise HTTPException(status_code=400, detail="Invite already accepted/rejected/withdrawn/expired")
     
     if (answer.response != EventInvitationStatus.accepted) and\
         (answer.response != EventInvitationStatus.rejected):
+        logger.warning(f"User {user.user_id} did not respond with accept/reject to invite {answer.invitation_id}")
         raise HTTPException(status_code=400, detail="Can only accept or reject invite")
 
 
     event_invite.status = answer.response
     db.commit()
     db.refresh(event_invite)
+    logger.info(f"User {user.user_id} responded to invitation {answer.invitation_id} with status {answer.response}")
     return event_invite
 
 
@@ -108,6 +120,7 @@ def get_received_invites(
         EventInvitation.status == EventInvitationStatus.pending
     )
 
+    logger.debug(f"User {user.user_id} fetched pending received invitations")
     return query.all()
 
 
@@ -130,6 +143,7 @@ def get_sent_invites(
     if status:
         query = query.filter(EventInvitation.status == status)
     
+    logger.debug(f"User {user.user_id} fetched sent invitations with event_id={event_id}, status={status}")
     return query.all()
 
 
@@ -146,9 +160,11 @@ def cancel_invitation(
     ).first()
 
     if not invitation:
+        logger.warning(f"User {user.user_id} tried to cancel non-existent invitation {invitation_id}")
         raise HTTPException(status_code=404, detail="Invitation does not exist")
     
     if invitation.status != EventInvitationStatus.pending:
+        logger.warning(f"User {user.user_id} tried to cancel invitation {invitation_id} which is not pending")
         raise HTTPException(status_code=400, detail="Invite already accepted, cannot delete")
     
 
@@ -157,16 +173,18 @@ def cancel_invitation(
     ).first()
 
     if not event:
+        logger.warning(f"User {user.user_id} tried to cancel invite {invitation_id} for a non-existent event")
         raise HTTPException(status_code=404, detail="Event not found")
 
     if event.user_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to cancel invitation {invitation_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to delete this invite")
     
     
     invitation.status = EventInvitationStatus.withdrawn
     db.commit()
     db.refresh(invitation)
-    print(f"[INFO] User {user.user_id} withdrew event invitation {invitation_id}")
+    logger.info(f"User {user.user_id} withdrew invitation {invitation_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

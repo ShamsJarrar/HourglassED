@@ -17,6 +17,7 @@ class Event(Base):
     linked_event_id = Column(Integer, ForeignKey("events.event_id", ondelete="SET NULL"))
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
-    event_class = relationship("EventClass", backref="events")
-    user = relationship("User", backref="events", foreign_keys=[user_id])
-    linked_event = relationship("Event", remote_side=[event_id])
+    event_class = relationship("EventClass", backref="events", passive_deletes=True)
+    user = relationship("User", backref="events", foreign_keys=[user_id], passive_deletes=True)
+    linked_event = relationship("Event", remote_side=[event_id], passive_deletes=True)
+    invitations = relationship("EventInvitation", back_populates="event", passive_deletes=True, cascade="all, delete-orphan")

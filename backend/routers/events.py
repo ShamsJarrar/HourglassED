@@ -9,6 +9,7 @@ from models.friend import Friend
 from schemas.event import EventCreate, EventResponse, EventUpdate
 from typing import List, Optional
 from datetime import datetime
+from logger import logger
 
 
 router = APIRouter(prefix='/event', tags=['Event'])
@@ -24,6 +25,7 @@ def create_event(
     event_class = get_event_class(event_info.event_type, db, user)
 
     if event_info.start_time >= event_info.end_time:
+        logger.warning(f"User {user.user_id} added invalid start and end times when creating an event")
         raise HTTPException(status_code=400, 
                             detail="start_time must be before end_time")
     
@@ -43,6 +45,7 @@ def create_event(
     db.commit()
     db.refresh(new_event)
 
+    logger.info(f"User {user.user_id} created event '{new_event.title}' with id {new_event.event_id}")
     return new_event
 
 
@@ -82,6 +85,7 @@ def get_user_events(
         *filters
     ).all()
     
+    logger.debug(f"User {user.user_id} fetched their events. owned_only={owned_only}, filters={filters}")
 
     if owned_only:
         return user_events
@@ -101,9 +105,11 @@ def get_event(
     ).first()
 
     if not event:
+        logger.warning(f"User {user.user_id} tried to access a non-existent event")
         raise HTTPException(status_code=404, detail="Event does not exist")
     
     if event.user_id == user.user_id:
+        logger.debug(f"User {user.user_id} fetched event with id:{event_id}")
         return event
     
 
@@ -114,8 +120,11 @@ def get_event(
     ).first()
 
     if not is_shared_event:
+        logger.warning(f"User {user.user_id} is not authorized to access event {event_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to access this event")
     
+
+    logger.debug(f"User {user.user_id} fetched event with id:{event.event_id}")
     return event
 
 
@@ -131,9 +140,11 @@ def update_event(
     event = db.query(Event).filter(Event.event_id == event_id).first()
 
     if not event:
+        logger.warning(f"User {user.user_id} tried to access a non-existent event")
         raise HTTPException(status_code=404, detail="Event does not exist")
     
     if event.user_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to edit event {event.event_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to edit this event")
     
     if updated_info.event_type is not None:
@@ -148,6 +159,7 @@ def update_event(
 
     db.commit()
     db.refresh(event)
+    logger.info(f"User {user.user_id} updated event {event_id}")
     return event
 
 
@@ -162,9 +174,11 @@ def delete_event(
     event = db.query(Event).filter(Event.event_id == event_id).first()
 
     if not event:
+        logger.warning(f"User {user.user_id} tried to access a non-existent event")
         raise HTTPException(status_code=404, detail="Event does not exist")
     
     if event.user_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to delete event {event.event_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to delete this event")
     
 
@@ -176,13 +190,10 @@ def delete_event(
         ])
     ).all()
 
-    for invite in invitations_to_event:
-        invite.status = EventInvitationStatus.expired
     
-
     db.delete(event)
     db.commit()
-    print(f"[INFO] User {user.user_id} deleted event {event_id}, marking {len(invitations_to_event)} invitations as expired")
+    logger.info(f"User {user.user_id} deleted event {event_id}. {len(invitations_to_event)} invitations marked as deleted.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -200,9 +211,11 @@ def remove_user_from_event(
     ).first()
 
     if not event:
+        logger.warning(f"User {user.user_id} tried to access a non-existent event")
         raise HTTPException(status_code=404, detail="Event does not exist")
     
     if event.user_id != user.user_id:
+        logger.warning(f"User {user.user_id} is not authorized to access event {event.event_id}")
         raise HTTPException(status_code=403, detail="You are not allowed to access this event")
     
 
@@ -213,12 +226,13 @@ def remove_user_from_event(
     ).first()
 
     if not invite:
+        logger.warning(f"User {user.user_id} tried to remove {invited_user_id} but didn't share event or invitee didn't accept it")
         raise HTTPException(status_code=404, detail="Event not shared with user or user did not accept invite")
     
 
     invite.status = EventInvitationStatus.removed
     db.commit()
-    print(f"[INFO] User {user.user_id} removed user {invited_user_id} from event {event_id}")
+    logger.info(f"User {user.user_id} removed user {invited_user_id} from event {event_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -237,10 +251,11 @@ def withdraw_from_event(
     ).first()
 
     if not invite:
+        logger.warning(f"User {user.user_id} does not have an accepted invitation to event {event_id}")
         raise HTTPException(status_code=404, detail="You do not have an accepted invitation for this event")
 
 
     invite.status = EventInvitationStatus.withdrawn
     db.commit()
-    print(f"[INFO] User {user.user_id} withdrew from event {event_id}")
+    logger.info(f"User {user.user_id} withdrew from event {event_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

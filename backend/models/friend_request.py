@@ -18,5 +18,5 @@ class FriendRequest(Base):
     status = Column(Enum(FriendRequestStatus), default=FriendRequestStatus.pending)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    sender = relationship("User", foreign_keys=[sender_id])
-    receiver = relationship("User", foreign_keys=[receiver_id])
+    sender = relationship("User", foreign_keys=[sender_id], passive_deletes=True)
+    receiver = relationship("User", foreign_keys=[receiver_id], passive_deletes=True)
