@@ -36,5 +36,3 @@ def root():
 #     except Exception as e:
 #         return {"status": "error", "detail": str(e)}
 
-
-# TODO: add notifications

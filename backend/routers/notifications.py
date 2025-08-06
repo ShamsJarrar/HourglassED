@@ -9,7 +9,7 @@ User receives in-app notifications in the following cases:
     - if they received a request
     - if their request was accepted
 
-3. Before an event in a certain amount of time (remind_me_before)
+3. (TO BE ADDED LATER)Before an event in a certain amount of time (remind_me_before)
 
 """
 

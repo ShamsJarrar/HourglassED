@@ -1,11 +1,17 @@
 from database import SessionLocal
 from sqlalchemy.orm import Session
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, HTTPAuthorizationCredentials
+from fastapi.security import OAuth2PasswordBearer, HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from utils.security import decode_access_token
 from schemas.token import TokenPayload
 from models.user import User
+
+
+# for testing using swagger, use HTTPBearer
+# oauth2_scheme = HTTPBearer()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
 
 
 def get_db():
@@ -15,13 +21,6 @@ def get_db():
     finally:
         db.close()
 
-# TODO: uncomment when testing is done
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
-# for testing using swagger, adding a temp endpoint to send token manually
-# instead of changing reponse schema
-from fastapi.security import HTTPBearer
-oauth2_scheme = HTTPBearer()
 
 def get_current_user(
         token: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
