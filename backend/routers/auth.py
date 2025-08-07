@@ -18,13 +18,14 @@ router = APIRouter(prefix='/auth', tags=["Auth"])
 def register(user: UserCreate, db: Session = Depends(get_db)):
 
     email = normalize_string(user.email)
+    name = normalize_string(user.name)
     exists = db.query(User).filter(User.email == email).first()
     if exists:
         logger.warning(f"Attempted registration with already registered email: {email}")
         raise HTTPException(status_code=400, detail="Email registered already")
     
     hashed_password = hash_password(user.password)
-    new_user = User(email=email, name=user.name, password=hashed_password)
+    new_user = User(email=email, name=name, password=hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user) # to add user_id
