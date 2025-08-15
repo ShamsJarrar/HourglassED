@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #633D00;
+  --text-on-brand: #FAF0DC;
+  --surface: #FFF8EB;
+  --border-muted: rgba(0,0,0,.08);
+}
+
+body {
+  font-family: var(--font-geist-sans);
+  background-color: var(--surface);
+}
