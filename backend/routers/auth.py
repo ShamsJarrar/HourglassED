@@ -25,13 +25,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email registered already")
     
     hashed_password = hash_password(user.password)
-    new_user = User(email=email, name=name, password=hashed_password)
+    # Auto-verify for development - remove this in production
+    new_user = User(email=email, name=name, password=hashed_password, is_verified=True)
     db.add(new_user)
     db.commit()
     db.refresh(new_user) # to add user_id
 
-    token = create_email_verification_token(new_user.user_id)
-    send_verification_email(email, token)
+    # TODO: Re-enable email verification for production
+    # token = create_email_verification_token(new_user.user_id)
+    # send_verification_email(email, token)
 
     logger.info(f"New user registered: {new_user.user_id} ({email})")
     return new_user
