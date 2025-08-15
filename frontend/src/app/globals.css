@@ -18,6 +18,12 @@
   --color-cream-light: #fff8eb;    /* Very light cream */
   --color-white: #ffffff;          /* Pure white */
   
+  /* Calendar Design Tokens */
+  --brand: #633D00;
+  --text-on-brand: #FAF0DC;
+  --surface: #FFF8EB;
+  --border-muted: rgba(0,0,0,.08);
+  
   /* Semantic Colors */
   --color-background: #faf0dc;     /* Main background */
   --color-surface: #ffffff;        /* Card/surface background */
