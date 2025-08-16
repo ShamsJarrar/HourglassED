@@ -1,18 +1,13 @@
-import Navbar from '@/components/Navbar';
-
-export default function DashboardLayout({
-  children,
-}: {
+interface DashboardLayoutProps {
   children: React.ReactNode;
-}) {
+}
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <div className="min-h-screen bg-[var(--surface)]">
-      <Navbar />
-      <main className="p-6">
-        <div className="grid grid-cols-[240px_1fr] gap-4">
-          {children}
-        </div>
-      </main>
+    <div className="bg-[#fff8eb] flex justify-center items-start min-h-screen w-full">
+      <div className="bg-[#fff8eb] w-[1512px] h-[982px] relative overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 }
