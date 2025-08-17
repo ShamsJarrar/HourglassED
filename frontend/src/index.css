@@ -1,33 +1,11 @@
 @import "tailwindcss";
 
-/* Tailwind v4 theme tokens */
-@theme {
-  /* Font */
-  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  /* Brand brown scale; brand.DEFAULT = #633D00 */
-  --color-brand-50: #f4e9d6;
-  --color-brand-100: #ead9be;
-  --color-brand-200: #d8bd95;
-  --color-brand-300: #c7a16b;
-  --color-brand-400: #a9783e;
-  --color-brand-500: #8a5a1d;
-  --color-brand-600: #633D00; /* DEFAULT root */
-  --color-brand-700: #533300;
-  --color-brand-800: #432900;
-  --color-brand-900: #2d1a00;
-  --color-brand: var(--color-brand-600);
-
-  /* Stroke color */
-  --color-stroke: #DCDCDC;
-
-  /* Semantic background/text defaults */
-  --color-bg: #FFF8EB;
-  --color-text-default: #FAF0DC;
-}
+/* Additional global tokens if needed */
 
 @layer base {
   html, body, #root {
     height: 100%;
+    margin: 0; /* eliminate default layout margins that create gutters */
   }
 
   body {
@@ -35,10 +13,8 @@
     background-color: var(--color-bg);
     color: var(--color-text-default);
     font-family: var(--font-sans);
+    margin: 0; /* remove default body margin so full-bleed backgrounds work */
   }
 
-  /* Default border color hook (use border-stroke) */
-  *, ::before, ::after {
-    border-color: var(--color-stroke);
-  }
+  /* Avoid global border styling that may cause unexpected visuals */
 }
