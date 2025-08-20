@@ -6,10 +6,12 @@ import ProtectedRoute from './routes/ProtectedRoute'
 import App from './App.tsx'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import VerifyEmail from './pages/VerifyEmail'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/signup', element: <Signup /> },
+  { path: '/verify-email', element: <VerifyEmail /> },
   {
     element: <ProtectedRoute />,
     children: [

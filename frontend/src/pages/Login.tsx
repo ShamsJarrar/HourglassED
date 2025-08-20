@@ -20,9 +20,15 @@ export default function Login() {
       localStorage.setItem('access_token', data.access_token)
       const from = (location.state as any)?.from?.pathname || '/'
       navigate(from, { replace: true })
-    } catch (err) {
-      // TODO: replace with toast once provider is added
-      alert('Login failed. Please check your credentials.')
+    } catch (err: any) {
+      const status = err?.response?.status
+      const detail = err?.response?.data?.detail
+      if (status === 403) {
+        // Not verified → send to OTP page with email and password for auto-login after verification
+        navigate('/verify-email', { replace: true, state: { email, password } })
+        return
+      }
+      alert(detail || 'Login failed. Please check your credentials.')
     }
   }
 

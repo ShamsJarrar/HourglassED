@@ -13,9 +13,8 @@ export default function Signup() {
     e.preventDefault()
     try {
       await api.post<UserResponse>('/auth/register', { name, email, password })
-      // no redirect to calendar page since email verification will be added later
-      alert('Account created and verified successfully. You can now log in.')
-      navigate('/login', { replace: true })
+      // Redirect to OTP verification with the user's email and password for auto-login
+      navigate('/verify-email', { replace: true, state: { email, password } })
     } catch (err) {
       alert('Sign up failed. Email may already be registered.')
     }
