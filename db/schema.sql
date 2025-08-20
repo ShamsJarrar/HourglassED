@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   name VARCHAR(100) NOT NULL,
-  is_verified BOOLEAN DEFAULT FALSE
+  is_verified BOOLEAN DEFAULT FALSE,
+  otp_code VARCHAR(6),
+  otp_expiration DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS event_classes (

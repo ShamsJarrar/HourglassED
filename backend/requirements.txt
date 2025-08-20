@@ -10,3 +10,4 @@ pydantic[email]
 celery
 redis
 django-celery-beat
+sendgrid==6.12.4

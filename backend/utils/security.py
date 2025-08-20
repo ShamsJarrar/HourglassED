@@ -4,12 +4,18 @@ from datetime import datetime, timedelta, timezone
 import os
 from dotenv import load_dotenv
 from logger import logger
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+import random
 
 
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINS = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINS", 60))
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "hourglassed.calendar@gmail.com")
+
 
 # init pwd hasher
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -43,19 +49,23 @@ def decode_access_token(token: str) -> str:
         raise JWTError("Invalid token") from e
 
 
-# email verification
-def create_email_verification_token(user_id: int) -> str:
-    logger.debug("Creating email verification token for user_id: %s", user_id)
-    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
-    payload = {
-        "sub": str(user_id),
-        "exp": expire.timestamp()
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+def generate_otp() -> str:
+    otp = f"{random.randint(0, 999999):06}"
+    logger.debug(f"Generated OTP: {otp}")
+    return otp
 
 
-# TODO: Integrate email verification api later
-def send_verification_email(email: str, token: str):
-    logger.info(f"[MOCK] Verification email triggered for {email}")
-    link = f"http://localhost:8000/auth/verify-email?token={token}"
-    print(f"[MOCK] Verification link for {email}: {link}")
+def send_otp_email(email: str, otp: str):
+    message = Mail(
+        from_email=FROM_EMAIL,
+        to_emails=email,
+        subject="Verify your email - HourglassED",
+        plain_text_content=f"Your OTP code is: {otp}. It will expire in 10 minutes."
+    )
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        logger.info(f"OTP email sent to {email} - status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to send OTP email to {email}: {e}")
+        raise
