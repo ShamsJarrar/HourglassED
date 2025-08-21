@@ -7,17 +7,23 @@ import App from './App.tsx'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import VerifyEmail from './pages/VerifyEmail'
+import LoaderLayout from './routes/LoaderLayout'
 
 const router = createBrowserRouter([
-  { path: '/login', element: <Login /> },
-  { path: '/signup', element: <Signup /> },
-  { path: '/verify-email', element: <VerifyEmail /> },
   {
-    element: <ProtectedRoute />,
+    element: <LoaderLayout />,
     children: [
-      { path: '/', element: <App /> },
-      { path: '/friends', element: <div /> },
-      { path: '/invitations', element: <div /> },
+      { path: '/login', element: <Login /> },
+      { path: '/signup', element: <Signup /> },
+      { path: '/verify-email', element: <VerifyEmail /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: '/', element: <App /> },
+          { path: '/friends', element: <div /> },
+          { path: '/invitations', element: <div /> },
+        ],
+      },
     ],
   },
 ])
