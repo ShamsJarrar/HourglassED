@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import ProtectedRoute from './routes/ProtectedRoute'
-import App from './App.tsx'
+import Calendar from './pages/Calendar'
+import Invitations from './pages/Invitations'
+import Friends from './pages/Friends'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import VerifyEmail from './pages/VerifyEmail'
@@ -19,9 +21,9 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { path: '/', element: <App /> },
-          { path: '/friends', element: <div /> },
-          { path: '/invitations', element: <div /> },
+          { path: '/', element: <Calendar /> },
+          { path: '/friends', element: <Friends /> },
+          { path: '/invitations', element: <Invitations /> },
         ],
       },
     ],
@@ -33,3 +35,5 @@ createRoot(document.getElementById('root')!).render(
     <RouterProvider router={router} />
   </StrictMode>,
 )
+
+// TODO: ADD requirements.txt for frontend
