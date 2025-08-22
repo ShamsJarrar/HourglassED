@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { EventResponse, InvitationStatus } from '../types/api'
 import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse } from '../lib/events'
 import type { EventUpdate } from '../types/api'
-import { getSentInvitations, getParticipants, type ParticipantResponse } from '../lib/invitations'
-import { getFriendById } from '../lib/friends'
+import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation } from '../lib/invitations'
+import { getFriendById, getFriendsList, type FriendsListResponseItem } from '../lib/friends'
 
 type InvitationRow = {
   invitationId: number
@@ -33,6 +33,9 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
   const [endLocal, setEndLocal] = useState<string>('')
   const [invitations, setInvitations] = useState<InvitationRow[] | null>(null)
   const [participants, setParticipants] = useState<ParticipantResponse[] | null>(null)
+  const [friends, setFriends] = useState<FriendsListResponseItem[] | null>(null)
+  const [selectedFriendId, setSelectedFriendId] = useState<number | ''>('')
+  const [inviteSubmitting, setInviteSubmitting] = useState(false)
   
 
   useEffect(() => {
@@ -144,6 +147,27 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
       isCancelled = true
     }
   }, [open, isOwner, event])
+
+  // Fetch friends for owners when modal opens
+  useEffect(() => {
+    let isCancelled = false
+    async function loadFriends() {
+      if (!open || !isOwner) {
+        setFriends(null)
+        return
+      }
+      try {
+        const list = await getFriendsList()
+        if (!isCancelled) setFriends(list)
+      } catch (e) {
+        if (!isCancelled) setFriends([])
+      }
+    }
+    loadFriends()
+    return () => {
+      isCancelled = true
+    }
+  }, [open, isOwner])
 
   if (!open || !event) return null
 
@@ -287,6 +311,52 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                   ))}
                 </ul>
               )}
+              <div className="mt-3 flex items-center gap-2">
+                <select
+                  value={selectedFriendId === '' ? '' : String(selectedFriendId)}
+                  onChange={(e) => setSelectedFriendId(e.target.value ? Number(e.target.value) : '')}
+                  className="flex-1 rounded-md border border-[#633D00] px-3 py-2 bg-white"
+                >
+                  <option value="">Select a friend…</option>
+                  {(friends ?? []).map((f) => (
+                    <option key={f.friend_id} value={f.friend_id}>{`${f.friend_name} — ${f.friend_email}`}</option>
+                  ))}
+                </select>
+                <button
+                  disabled={inviteSubmitting || selectedFriendId === '' || !event}
+                  onClick={async () => {
+                    if (!event || selectedFriendId === '') return
+                    try {
+                      setInviteSubmitting(true)
+                      await createInvitation({ event_id: event.event_id, invited_user_id: Number(selectedFriendId) })
+                      // refresh invitations list
+                      const sent = await getSentInvitations({ event_id: event.event_id })
+                      const rows: InvitationRow[] = await Promise.all(
+                        sent.map(async (inv) => {
+                          const friendId = inv.invited_user_id
+                          if (friendId != null) {
+                            try {
+                              const f = await getFriendById(friendId)
+                              return { invitationId: inv.invitation_id, status: inv.status, userName: f.friend_name, userEmail: f.friend_email }
+                            } catch {}
+                          }
+                          const email = inv.invited_user?.email
+                          return { invitationId: inv.invitation_id, status: inv.status, userName: email ? email.split('@')[0] : 'Unknown user', userEmail: email ?? '—' }
+                        })
+                      )
+                      setInvitations(rows)
+                      setSelectedFriendId('')
+                    } catch (e) {
+                      // silently fail to UI; could add toast
+                    } finally {
+                      setInviteSubmitting(false)
+                    }
+                  }}
+                  className="rounded-md bg-[#633D00] text-[#FAF0DC] px-4 py-2 hover:bg-[#765827] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {inviteSubmitting ? 'Inviting…' : 'Invite'}
+                </button>
+              </div>
             </div>
           )}
           {!isOwner && (

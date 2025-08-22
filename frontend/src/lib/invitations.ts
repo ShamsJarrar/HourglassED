@@ -24,3 +24,13 @@ export async function getParticipants(eventId: number): Promise<ParticipantRespo
   const res = await api.get<ParticipantResponse[]>(`/invitations/participants/${eventId}`);
   return res.data;
 }
+
+export interface CreateInvitationBody {
+  event_id: number;
+  invited_user_id: number;
+}
+
+export async function createInvitation(body: CreateInvitationBody) {
+  const res = await api.post(`/invitations/`, body);
+  return res.data;
+}

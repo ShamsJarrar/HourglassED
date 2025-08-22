@@ -198,16 +198,20 @@ def view_friends(
 
     friend_ids = [friend.friend_id for friend in friends]
 
-    friend_users = db.query(User).filter(
-        User.user_id.in_(friend_ids)
-    ).all()
+    friend_users = db.query(User).filter(User.user_id.in_(friend_ids)).all()
+
+    # Build a mapping from user_id -> user for quick lookup
+    user_by_id = {u.user_id: u for u in friend_users}
 
     friend_responses = []
-    for friend in friend_users:
-        friend_responses.append(FriendResponse(
-            friend_name=friend.name,
-            friend_email=friend.email
-        ))
+    for fr in friends:
+        user = user_by_id.get(fr.friend_id)
+        if user:
+            friend_responses.append(FriendResponse(
+                friend_id=fr.friend_id,
+                friend_name=user.name,
+                friend_email=user.email
+            ))
 
     logger.debug(f"User {cur_user.user_id} fetched friend list")
     return friend_responses

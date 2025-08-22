@@ -88,3 +88,10 @@ export interface FriendResponse {
   friend_name: string;
   friend_email: string;
 }
+
+// Friends list (owner inviting): backend may include the user id
+export interface FriendListItem {
+  friend_id?: number;
+  friend_name: string;
+  friend_email: string;
+}
