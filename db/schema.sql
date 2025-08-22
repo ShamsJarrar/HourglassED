@@ -28,13 +28,14 @@ CREATE TABLE IF NOT EXISTS events (
   title VARCHAR(255) NOT NULL,
   start_time DATETIME NOT NULL,
   end_time DATETIME NOT NULL,
-  recurrence_pattern VARCHAR(255),
   color VARCHAR(20) DEFAULT '#4A90E2',
   notes TEXT,
   linked_event_id INT,
+  recurring_event_id INT, -- NEW: series ID for expanded events
   user_id INT NOT NULL,
   FOREIGN KEY (event_type) REFERENCES event_classes(class_id) ON DELETE RESTRICT,
   FOREIGN KEY (linked_event_id) REFERENCES events(event_id) ON DELETE SET NULL,
+  FOREIGN KEY (recurring_event_id) REFERENCES events(event_id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 

@@ -9,10 +9,10 @@ class EventCreate(BaseModel):
     title: str
     start_time: datetime
     end_time: datetime
-    recurrence_pattern: Optional[str] = None
     color: Optional[str] = None
     notes: Optional[str] = None
     linked_event_id: Optional[int] = None
+    recurring_event_id: Optional[int] = None  
 
 
 class EventResponse(EventCreate):
@@ -30,10 +30,10 @@ class EventUpdate(BaseModel):
     title: Optional[str] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    recurrence_pattern: Optional[str] = None
     color: Optional[str] = None
     notes: Optional[str] = None
     linked_event_id: Optional[int] = None
+    recurring_event_id: Optional[int] = None
 
 
 class EventOwnerEmail(BaseModel):

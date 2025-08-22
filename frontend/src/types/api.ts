@@ -11,3 +11,31 @@ export interface TokenWithUserResponse {
 }
 
 
+
+// Events
+export interface EventCreate {
+  event_type: string;
+  header?: string | null;
+  title: string;
+  start_time: string; // ISO datetime string
+  end_time: string;   // ISO datetime string
+  color?: string | null;
+  notes?: string | null;
+  linked_event_id?: number | null;
+  recurring_event_id?: number | null;
+}
+
+// Note: EventResponse from backend returns numeric class id
+export interface EventResponse {
+  event_id: number;
+  user_id: number;
+  event_type: number;
+  header?: string | null;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string | null;
+  notes?: string | null;
+  linked_event_id?: number | null;
+  recurring_event_id?: number | null;
+}

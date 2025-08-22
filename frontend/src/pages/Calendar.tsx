@@ -8,6 +8,9 @@ import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
 import rrulePlugin from '@fullcalendar/rrule'
 import multiMonthPlugin from '@fullcalendar/multimonth'
+import { getEvents } from '../lib/events'
+import type { EventContentArg } from '@fullcalendar/core'
+import type { EventResponse } from '../types/api'
 // CSS loaded via CDN in index.html to avoid import-analysis issues
 
 export default function Calendar() {
@@ -15,6 +18,17 @@ export default function Calendar() {
   const [open, setOpen] = useState(false)
   const [toolbarRightEl, setToolbarRightEl] = useState<HTMLElement | null>(null)
   const [currentViewLabel, setCurrentViewLabel] = useState('Month')
+  const [events, setEvents] = useState<{
+    id: string
+    title: string
+    start: string
+    end: string
+    backgroundColor?: string
+    borderColor?: string
+    textColor?: string
+  }[]>([])
+  // reserved for future loading indicators
+  // const [isLoading, setIsLoading] = useState(false)
 
   const viewOptions: { id: string; label: string }[] = [
     { id: 'multiMonthYear', label: 'Year' },
@@ -36,6 +50,66 @@ export default function Calendar() {
     const el = document.querySelector('.fc .fc-toolbar .fc-toolbar-chunk:last-child') as HTMLElement | null
     if (el) setToolbarRightEl(el)
   }, [])
+
+  // Fetch events when the calendar date range changes
+  const handleDatesSet = async (arg: { start: Date; end: Date }) => {
+    try {
+      const startIso = arg.start.toISOString()
+      const endIso = arg.end.toISOString()
+      const data: EventResponse[] = await getEvents({ start_time: startIso, end_time: endIso })
+      const mapped = data.map((e) => {
+        const normalizeHex = (val?: string) => {
+          if (!val) return undefined
+          const v = val.startsWith('#') ? val : `#${val}`
+          return v.length === 4 || v.length === 7 ? v : undefined
+        }
+        const darkenHex = (hex?: string, amount = 35) => {
+          if (!hex) return undefined
+          let c = hex.replace('#', '')
+          if (c.length === 3) c = c.split('').map((x) => x + x).join('')
+          const r = Math.max(0, parseInt(c.substring(0, 2), 16) - amount)
+          const g = Math.max(0, parseInt(c.substring(2, 4), 16) - amount)
+          const b = Math.max(0, parseInt(c.substring(4, 6), 16) - amount)
+          const toHex = (n: number) => n.toString(16).padStart(2, '0')
+          return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+        }
+        const bg = normalizeHex(e.color || undefined)
+        const border = darkenHex(bg)
+        return {
+        id: String(e.event_id),
+        title: e.title,
+        start: e.start_time,
+        end: e.end_time,
+        backgroundColor: bg,
+        borderColor: border || bg,
+        extendedProps: { header: e.header ?? undefined },
+        }
+      })
+      setEvents(mapped)
+    } catch (err) {
+      // TODO: surface error toast/UI later
+      console.error('Failed to load events', err)
+    }
+  }
+
+  const getContrastTextColor = (hex?: string) => {
+    if (!hex) return '#633D00'
+    let c = hex.replace('#', '')
+    if (c.length === 3) c = c.split('').map((x) => x + x).join('')
+    const r = parseInt(c.substring(0, 2), 16)
+    const g = parseInt(c.substring(2, 4), 16)
+    const b = parseInt(c.substring(4, 6), 16)
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return luminance < 140 ? '#FAF0DC' : '#533300'
+  }
+
+  const renderEventContent = (arg: EventContentArg) => {
+    const header = (arg.event.extendedProps as { header?: string | undefined })?.header
+    const label = header ? `${header.toUpperCase()}: ${arg.event.title}` : arg.event.title
+    const bg = (arg.backgroundColor as string) || undefined
+    const color = getContrastTextColor(bg)
+    return <div className="truncate" style={{ color }}>{label}</div>
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF0DC]">
@@ -68,7 +142,10 @@ export default function Calendar() {
               editable={false}
               selectable={true}
               dayMaxEvents={true}
-              events={[]}
+              eventDisplay="block"
+              events={events}
+              datesSet={handleDatesSet}
+              eventContent={renderEventContent}
             />
             {toolbarRightEl && createPortal(
               <div className="relative">

@@ -95,3 +95,41 @@
 .fc .fc-list-table td {
   color: #533300 !important;
 }
+
+/* Improve event label wrapping/clipping in time grid */
+.fc-timegrid-event .fc-event-main,
+.fc-timegrid-more-link,
+.fc-daygrid-event .fc-event-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Multi-day spanning events should keep readable contrast */
+.fc .fc-event {
+  border-width: 2px;
+  box-sizing: border-box;
+}
+
+/* Overlapping timegrid events: ensure borders and minimal padding to keep text visible */
+.fc-timegrid-event-harness .fc-timegrid-event {
+  border-width: 2px;
+  padding: 0 2px;
+}
+
+/* Slight left inset for overlapping time events so borders are visible */
+.fc .fc-timegrid-col .fc-timegrid-event-harness-inset .fc-timegrid-event,
+.fc .fc-timegrid-col .fc-timegrid-event-harness {
+  margin-left: 1px; /* nudge left */
+}
+
+/* Month view: ensure daygrid events retain their background even when stacked */
+.fc-daygrid-event-harness .fc-daygrid-event {
+  border-width: 2px;
+  box-sizing: border-box;
+}
+
+/* Month view overlap tweak: reduce inner padding so color shows more clearly */
+.fc-daygrid-event .fc-event-main {
+  padding: 0 3px;
+}

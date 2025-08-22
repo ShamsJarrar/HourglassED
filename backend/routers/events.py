@@ -35,7 +35,7 @@ def create_event(
         title = event_info.title,
         start_time = event_info.start_time,
         end_time = event_info.end_time,
-        recurrence_pattern = event_info.recurrence_pattern,
+        recurring_event_id = event_info.recurring_event_id,
         color = event_info.color,
         notes = event_info.notes,
         linked_event_id = event_info.linked_event_id,
@@ -62,14 +62,19 @@ def get_user_events(
     
     filters = []
 
-    if start_time is not None:
-        filters.append(Event.start_time >= start_time)
-    if end_time is not None:
-        filters.append(Event.end_time <= end_time)
+    # Proper overlap filtering when both bounds are provided:
+    # (event.start < viewEnd) AND (event.end > viewStart)
+    if start_time is not None and end_time is not None:
+        filters.append(Event.start_time < end_time)
+        filters.append(Event.end_time > start_time)
+    else:
+        if start_time is not None:
+            filters.append(Event.end_time > start_time)
+        if end_time is not None:
+            filters.append(Event.start_time < end_time)
     if event_type is not None:
         filters.append(Event.event_type == event_type)
 
-    
     user_events = db.query(Event).filter(
         Event.user_id == user.user_id,
         *filters
@@ -151,7 +156,7 @@ def update_event(
         event_class = get_event_class(updated_info.event_type, db, user)
         event.event_type = event_class.class_id
     
-    for field in ["header", "title", "start_time", "end_time", "recurrence_pattern", "color", "notes", "linked_event_id"]:
+    for field in ["header", "title", "start_time", "end_time", "color", "notes", "linked_event_id", "recurring_event_id"]:
         value = getattr(updated_info, field)
         if value is not None:
             setattr(event, field, value)
