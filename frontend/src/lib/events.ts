@@ -30,4 +30,6 @@ export async function updateEvent(eventId: number, body: EventUpdate): Promise<E
   return res.data;
 }
 
-
+export async function deleteEventById(eventId: number): Promise<void> {
+  await api.delete(`/event/${eventId}`);
+}

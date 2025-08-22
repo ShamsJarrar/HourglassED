@@ -51,3 +51,40 @@ export interface EventUpdate {
   linked_event_id?: number | null;
   recurring_event_id?: number | null;
 }
+
+// Invitations
+export type InvitationStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "withdrawn"
+  | "removed"
+  | "expired";
+
+export interface EventInvitationWithEvent {
+  invitation_id: number;
+  status: InvitationStatus;
+  created_at: string;
+  // Backend may include either invited_user_id or invited_user.email depending on schema
+  invited_user_id?: number;
+  invited_user?: { email: string } | null;
+  event: {
+    event_id: number;
+    event_type: number;
+    user: { email: string };
+    header?: string | null;
+    title: string;
+    start_time: string;
+    end_time: string;
+    color?: string | null;
+    notes?: string | null;
+    linked_event_id?: number | null;
+    recurring_event_id?: number | null;
+  };
+}
+
+// Friends
+export interface FriendResponse {
+  friend_name: string;
+  friend_email: string;
+}

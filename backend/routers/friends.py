@@ -195,8 +195,57 @@ def view_friends(
     friends = db.query(Friend).filter(
         Friend.user_id == cur_user.user_id,
     ).all()
+
+    friend_ids = [friend.friend_id for friend in friends]
+
+    friend_users = db.query(User).filter(
+        User.user_id.in_(friend_ids)
+    ).all()
+
+    friend_responses = []
+    for friend in friend_users:
+        friend_responses.append(FriendResponse(
+            friend_name=friend.name,
+            friend_email=friend.email
+        ))
+
     logger.debug(f"User {cur_user.user_id} fetched friend list")
-    return friends
+    return friend_responses
+
+
+
+@router.get('/friends/{friend_id}', response_model=FriendResponse)
+def view_friend(
+    friend_id: int,
+    db: Session = Depends(get_db),
+    cur_user: User = Depends(get_current_user)
+):
+    # Ensure the requested user exists
+    friend_user = db.query(User).filter(
+        User.user_id == friend_id
+    ).first()
+
+    if not friend_user:
+        logger.warning(f"User {cur_user.user_id} requested non-existent friend user {friend_id}")
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Ensure the requested user is actually a friend of the current user
+    friendship = db.query(Friend).filter(
+        Friend.user_id == cur_user.user_id,
+        Friend.friend_id == friend_id
+    ).first()
+
+    if not friendship:
+        logger.warning(f"User {cur_user.user_id} is not authorized to view non-friend user {friend_id}")
+        raise HTTPException(status_code=403, detail="You are not authorized to view this user")
+
+    friend_response = FriendResponse(
+        friend_name=friend_user.name,
+        friend_email=friend_user.email
+    )
+
+    logger.debug(f"User {cur_user.user_id} fetched friend user {friend_id}")
+    return friend_response
 
 
 # request sender can unsend request if it is still pending
@@ -257,4 +306,5 @@ def unfriend(
     db.commit()
     logger.info(f"User {user.user_id} unfriended {friend_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 

@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { EventResponse } from '../types/api'
-import { getEventClasses, updateEvent, type EventClassResponse } from '../lib/events'
+import type { EventResponse, InvitationStatus } from '../types/api'
+import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse } from '../lib/events'
 import type { EventUpdate } from '../types/api'
+import { getSentInvitations, getParticipants, type ParticipantResponse } from '../lib/invitations'
+import { getFriendById } from '../lib/friends'
+
+type InvitationRow = {
+  invitationId: number
+  status: InvitationStatus | string
+  userName: string
+  userEmail: string
+}
 
 interface Props {
   event: EventResponse | null
@@ -22,6 +31,9 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
   const [customTypeName, setCustomTypeName] = useState<string>('')
   const [startLocal, setStartLocal] = useState<string>('')
   const [endLocal, setEndLocal] = useState<string>('')
+  const [invitations, setInvitations] = useState<InvitationRow[] | null>(null)
+  const [participants, setParticipants] = useState<ParticipantResponse[] | null>(null)
+  
 
   useEffect(() => {
     if (!open) return
@@ -61,21 +73,92 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
     }
     setStartLocal(toLocalInput(event.start_time))
     setEndLocal(toLocalInput(event.end_time))
+    
   }, [event, classNameById])
+
+  // Fetch invitations for owners when modal opens
+  useEffect(() => {
+    let isCancelled = false
+    async function loadInvitations() {
+      if (!open || !isOwner || !event) {
+        setInvitations(null)
+        return
+      }
+      setInvitations(null)
+      try {
+        const sent = await getSentInvitations({ event_id: event.event_id })
+        const rows: InvitationRow[] = await Promise.all(
+          sent.map(async (inv) => {
+            const friendId = inv.invited_user_id
+            if (friendId != null) {
+              try {
+                const f = await getFriendById(friendId)
+                return {
+                  invitationId: inv.invitation_id,
+                  status: inv.status,
+                  userName: f.friend_name,
+                  userEmail: f.friend_email,
+                }
+              } catch {
+                // fallback if friend fetch fails
+              }
+            }
+            const email = inv.invited_user?.email
+            return {
+              invitationId: inv.invitation_id,
+              status: inv.status,
+              userName: email ? email.split('@')[0] : 'Unknown user',
+              userEmail: email ?? '—',
+            }
+          })
+        )
+        if (!isCancelled) setInvitations(rows)
+      } catch (e) {
+        if (!isCancelled) setInvitations([])
+      }
+    }
+    loadInvitations()
+    return () => {
+      isCancelled = true
+    }
+  }, [open, isOwner, event])
+
+  // Fetch participants for non-owners when modal opens
+  useEffect(() => {
+    let isCancelled = false
+    async function loadParticipants() {
+      if (!open || isOwner || !event) {
+        setParticipants(null)
+        return
+      }
+      setParticipants(null)
+      try {
+        const res = await getParticipants(event.event_id)
+        if (!isCancelled) setParticipants(res)
+      } catch (e) {
+        if (!isCancelled) setParticipants([])
+      }
+    }
+    loadParticipants()
+    return () => {
+      isCancelled = true
+    }
+  }, [open, isOwner, event])
 
   if (!open || !event) return null
 
   const readOnly = !isOwner
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
-      <div className="w-[520px] max-w-[92vw] rounded-xl bg-[#FFF8EB] border-2 border-[#633D00] p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30" onClick={onClose}>
+      <div className="w-[520px] max-w-[92vw] max-h-[86vh] rounded-xl bg-[#FFF8EB] border-2 border-[#633D00] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 flex flex-col" style={{ maxHeight: '86vh' }}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-[#633D00]">Event Details</h2>
           <button onClick={onClose} className="text-[#633D00] border border-[#633D00] rounded-md px-2 py-0.5">Close</button>
         </div>
 
-        <div className="space-y-3 text-[#633D00]">
+        <div className="space-y-3 text-[#633D00] flex-1 overflow-y-auto no-scrollbar">
           <div>
             <label className="block text-sm mb-1">Type</label>
             {readOnly ? (
@@ -181,9 +264,76 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
             <label className="block text-sm mb-1">Notes</label>
             <textarea value={notes ?? ''} onChange={(e) => setNotes(e.target.value)} disabled={readOnly} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white min-h-24" />
           </div>
+          {isOwner && (
+            <div className="pt-3 border-t border-[#633D00]/30">
+              <label className="block text-sm font-medium mb-2">Invitations</label>
+              {invitations === null ? (
+                <div className="text-sm text-[#633D00]/70">Loading invitations…</div>
+              ) : invitations.length === 0 ? (
+                <div className="text-sm text-[#633D00]/70">No invitations sent.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {invitations.map((inv) => (
+                    <li key={inv.invitationId} className="flex items-start justify-between gap-3 rounded-md border border-[#633D00]/30 bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{inv.userName}</div>
+                        <div className="text-xs text-[#633D00]/70 truncate">{inv.userEmail}</div>
+                      </div>
+                      <div className="text-sm whitespace-nowrap">
+                        <span className="text-[#633D00]/80">status: </span>
+                        <span className="uppercase tracking-wide text-[#633D00]">{String(inv.status)}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+          {!isOwner && (
+            <div className="pt-3 border-t border-[#633D00]/30">
+              <label className="block text-sm font-medium mb-2">Participants</label>
+              {participants === null ? (
+                <div className="text-sm text-[#633D00]/70">Loading participants…</div>
+              ) : participants.length === 0 ? (
+                <div className="text-sm text-[#633D00]/70">No participants found.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {participants.map((p, idx) => (
+                    <li key={`${p.user_email}-${idx}`} className="flex items-start justify-between gap-3 rounded-md border border-[#633D00]/30 bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {p.user_name} {idx === 0 && <span className="text-xs text-[#633D00]/70">(Owner)</span>}
+                        </div>
+                        <div className="text-xs text-[#633D00]/70 truncate">{p.user_email}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="mt-5 flex justify-end gap-3">
+        
+
+        <div className="mt-8 flex justify-between gap-3">
+          {isOwner && (
+            <button
+              onClick={async () => {
+                if (!event) return
+                if (!confirm('Delete this event? This cannot be undone.')) return
+                try {
+                  await deleteEventById(event.event_id)
+                  onClose()
+                } catch (e) {
+                  console.error('Failed to delete event', e)
+                }
+              }}
+              className="rounded-md border border-red-700 text-red-700 px-4 py-2 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          )}
           {isOwner && (
             <button
               onClick={async () => {
@@ -211,6 +361,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               Save
             </button>
           )}
+        </div>
         </div>
       </div>
     </div>

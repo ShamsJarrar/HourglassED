@@ -1,3 +1,4 @@
+from ecdsa import der
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.orm import Session
 from dependencies import get_current_user, get_db
@@ -5,11 +6,12 @@ from models.user import User
 from models.event import Event
 from models.event_invitation import EventInvitation, EventInvitationStatus
 from models.friend import Friend
-from schemas.event_invitation import EventInvitationCreate, EventInvitationResponse, EventInvitationResponseUpdate, EventInvitationWithEvent
+from schemas.event_invitation import EventInvitationCreate, EventInvitationResponse, EventInvitationResponseUpdate, EventInvitationWithEvent, ParticipantsResponse
 from utils.notifications import create_notification
 from typing import List, Optional
 from logger import logger
 from tasks import expire_passed_invitations
+
 
 
 router = APIRouter(prefix='/invitations', tags=['Event invitations'])
@@ -216,6 +218,53 @@ def cancel_invitation(
     db.refresh(invitation)
     logger.info(f"User {user.user_id} withdrew invitation {invitation_id}")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+
+@router.get('/participants/{event_id}', response_model=List[ParticipantsResponse])
+def get_participants(
+    event_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    participants: list[ParticipantsResponse] = []
+
+    # Fetch event and owner
+    event = db.query(Event).filter(Event.event_id == event_id).first()
+    if not event:
+        logger.warning(f"User {user.user_id} requested participants for non-existent event {event_id}")
+        raise HTTPException(status_code=404, detail="Event does not exist")
+
+    owner = db.query(User).filter(User.user_id == event.user_id).first()
+    if not owner:
+        logger.warning(f"Owner with id {event.user_id} not found for event {event_id}")
+        raise HTTPException(status_code=404, detail="Owner not found")
+
+    participants.append(ParticipantsResponse(
+        user_name=owner.name,
+        user_email=owner.email
+    ))
+
+    # Fetch accepted invitee user ids and resolve to users
+    invited_user_id_rows = db.query(EventInvitation.invited_user_id).filter(
+        EventInvitation.event_id == event_id,
+        EventInvitation.status == EventInvitationStatus.accepted
+    ).all()
+
+    invited_user_ids = [row[0] for row in invited_user_id_rows]
+
+    if invited_user_ids:
+        invited_users = db.query(User).filter(User.user_id.in_(invited_user_ids)).all()
+        for par in invited_users:
+            participants.append(ParticipantsResponse(
+                user_name=par.name,
+                user_email=par.email
+            ))
+
+    logger.debug(f"User {user.user_id} fetched participants for event {event_id}")
+    return participants
+
 
 
 # endpoint for testing if celery works correctly
