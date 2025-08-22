@@ -23,3 +23,75 @@
 
   /* Avoid global border styling that may cause unexpected visuals */
 }
+
+/* FullCalendar theming with app colors */
+:root {
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: #FFF8EB; /* calendar bg */
+  --fc-border-color: #DCDCDC; /* strokes */
+  --fc-button-bg-color: #633D00;
+  --fc-button-border-color: #633D00;
+  --fc-button-text-color: #FAF0DC;
+  --fc-button-hover-bg-color: #8a5a1d;
+  --fc-button-hover-border-color: #8a5a1d;
+  --fc-button-active-bg-color: #533300;
+  --fc-button-active-border-color: #533300;
+  --fc-today-bg-color: rgba(99,61,0,0.08);
+  --fc-highlight-color: rgba(99,61,0,0.15);
+  --fc-event-bg-color: #633D00;
+  --fc-event-border-color: #633D00;
+  --fc-event-text-color: #FAF0DC;
+  --fc-text-color: #533300; /* darker brown for calendar text */
+}
+
+/* Prev/Next buttons: transparent background, brown text, rounded border on hover */
+.fc .fc-toolbar .fc-prev-button,
+.fc .fc-toolbar .fc-next-button {
+  background: transparent !important;
+  color: #633D00 !important;
+  border: 2px solid transparent !important;
+  box-shadow: none !important;
+  padding: 0.15rem 0.35rem !important;
+  line-height: 1 !important;
+}
+
+.fc .fc-toolbar .fc-prev-button:hover,
+.fc .fc-toolbar .fc-next-button:hover {
+  background: transparent !important;
+  border-color: #633D00 !important;
+  border-radius: 0.5rem !important; /* rounded stroke */
+}
+
+/* Today button: background matches calendar bg, brown text/border, never disabled */
+.fc .fc-toolbar .fc-today-button,
+.fc .fc-toolbar .fc-button.fc-today-button:disabled {
+  background: #FFF8EB !important;
+  color: #633D00 !important;
+  border: 2px solid #633D00 !important;
+  opacity: 1 !important; /* prevent disabled style */
+  pointer-events: auto !important;
+}
+.fc .fc-toolbar .fc-today-button:hover {
+  background: #ead9be !important;
+  border-color: #633D00 !important;
+}
+
+/* Today button (custom) styles */
+.fc .fc-toolbar .fc-todayBtn-button {
+  background: #FFF8EB !important; /* same as calendar bg */
+  color: #633D00 !important;
+  border: 2px solid #633D00 !important;
+}
+.fc .fc-toolbar .fc-todayBtn-button:disabled {
+  opacity: 1 !important; /* prevent dimming */
+  cursor: pointer !important;
+}
+
+/* Ensure key calendar texts use dark brown */
+.fc .fc-toolbar-title,
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number,
+.fc .fc-list-day-cushion,
+.fc .fc-list-table td {
+  color: #533300 !important;
+}

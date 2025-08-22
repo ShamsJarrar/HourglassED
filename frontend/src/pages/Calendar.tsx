@@ -1,11 +1,104 @@
 import NavBar from '../components/NavBar'
+import FullCalendar from '@fullcalendar/react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import listPlugin from '@fullcalendar/list'
+import rrulePlugin from '@fullcalendar/rrule'
+import multiMonthPlugin from '@fullcalendar/multimonth'
+// CSS loaded via CDN in index.html to avoid import-analysis issues
 
 export default function Calendar() {
+  const calendarRef = useRef<FullCalendar | null>(null)
+  const [open, setOpen] = useState(false)
+  const [toolbarRightEl, setToolbarRightEl] = useState<HTMLElement | null>(null)
+  const [currentViewLabel, setCurrentViewLabel] = useState('Month')
+
+  const viewOptions: { id: string; label: string }[] = [
+    { id: 'multiMonthYear', label: 'Year' },
+    { id: 'dayGridMonth', label: 'Month' },
+    { id: 'timeGridWeek', label: 'Week' },
+    { id: 'timeGridDay', label: 'Day' },
+    { id: 'listWeek', label: 'List' },
+  ]
+
+  const changeView = (id: string, label: string) => {
+    const api = calendarRef.current?.getApi()
+    api?.changeView(id)
+    setCurrentViewLabel(label)
+    setOpen(false)
+  }
+
+  useEffect(() => {
+    // Find FullCalendar right toolbar chunk to align custom button with title and controls
+    const el = document.querySelector('.fc .fc-toolbar .fc-toolbar-chunk:last-child') as HTMLElement | null
+    if (el) setToolbarRightEl(el)
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#FAF0DC]">
       <NavBar />
-      <main className="mx-auto w-full max-w-6xl px-6 py-6">
-        <div className="text-[#633D00]">Calendar page placeholder</div>
+      <main className="mx-auto w-full px-6 py-6">
+        <div className="flex items-stretch gap-6">
+          {/* Left panel (smaller section) */}
+          <aside className="w-45 shrink-0 rounded-xl bg-[#FAF0DC] text-[#FAF0DC] p-3 flex flex-col justify-center space-y-20">
+            <button className="w-full inline-flex items-center justify-center gap-3 rounded-xl text-lg bg-[#633D00] text-[#FAF0DC] font-medium px-4 py-4 transition-colors hover:bg-[#765827] shadow-xl">
+              <img src="/icons/plus_icon.svg" alt="Create" className="h-5 w-5" />
+              <span>Create</span>
+            </button>
+            <button className="w-10/12 self-center inline-flex items-center justify-center gap-3 rounded-xl bg-[#FAF0DC] text-[#633D00] font-medium px-4 py-3 transition-colors hover:bg-[#ead9be] border-1 border-[#633D00]">
+              <img src="/icons/filter_icon.svg" alt="Filters" className="h-4 w-4" />
+              <span>Filters</span>
+            </button>
+            <button className="w-10/12 self-center inline-flex items-center justify-center gap-3 rounded-xl bg-[#FAF0DC] text-[#633D00] font-medium px-4 py-3 transition-colors hover:bg-[#ead9be] border-1 border-[#633D00]">
+              <span>Organize with agent</span>
+            </button>
+          </aside>
+
+          {/* Right panel (bigger section): Calendar */}
+          <section className="flex-1 min-w-0 rounded-xl bg-[#FFF8EB] p-3">
+            <FullCalendar
+              ref={calendarRef}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin, rrulePlugin, multiMonthPlugin]}
+              initialView="dayGridMonth"
+              headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
+              height="auto"
+              editable={false}
+              selectable={true}
+              dayMaxEvents={true}
+              events={[]}
+            />
+            {toolbarRightEl && createPortal(
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpen((v) => !v)}
+                  className="inline-flex items-center rounded-md border-2 border-[#633D00] bg-[#FFF8EB] px-3 py-1.5 text-[#633D00] font-medium transition-colors hover:bg-[#ead9be]"
+                >
+                  {currentViewLabel}
+                  <img src="/icons/down_icon.svg" alt="Open" className="ml-2 h-4 w-4" />
+                </button>
+                {open && (
+                  <div className="absolute right-0 z-10 mt-2 w-40 overflow-hidden rounded-md border border-[#633D00]/40 bg-[#633D00] text-[#FAF0DC] shadow-lg">
+                    {viewOptions.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => changeView(opt.id, opt.label)}
+                        className="block w-full px-3 py-2 text-left hover:bg-[#8a5a1d]"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>,
+              toolbarRightEl
+            )}
+          </section>
+        </div>
       </main>
     </div>
   )
