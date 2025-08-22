@@ -36,4 +36,3 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// TODO: ADD requirements.txt for frontend

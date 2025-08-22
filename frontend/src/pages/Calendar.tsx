@@ -11,6 +11,8 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import { getEvents } from '../lib/events'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { EventResponse } from '../types/api'
+import EventModal from '../components/EventModal'
+import { parseJwt } from '../utils/jwt'
 // CSS loaded via CDN in index.html to avoid import-analysis issues
 
 export default function Calendar() {
@@ -29,6 +31,8 @@ export default function Calendar() {
   }[]>([])
   // reserved for future loading indicators
   // const [isLoading, setIsLoading] = useState(false)
+  const [selected, setSelected] = useState<EventResponse | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
 
   const viewOptions: { id: string; label: string }[] = [
     { id: 'multiMonthYear', label: 'Year' },
@@ -82,7 +86,12 @@ export default function Calendar() {
         end: e.end_time,
         backgroundColor: bg,
         borderColor: border || bg,
-        extendedProps: { header: e.header ?? undefined },
+        extendedProps: {
+          header: e.header ?? undefined,
+          event_type: e.event_type,
+          user_id: e.user_id,
+          notes: e.notes ?? undefined,
+        },
         }
       })
       setEvents(mapped)
@@ -146,6 +155,27 @@ export default function Calendar() {
               events={events}
               datesSet={handleDatesSet}
               eventContent={renderEventContent}
+              eventClick={(info) => {
+                const e = info.event
+                const ep: any = e.extendedProps || {}
+                const mapped: EventResponse = {
+                  event_id: Number(e.id),
+                  user_id: typeof ep.user_id === 'number' ? ep.user_id : 0,
+                  event_type: typeof ep.event_type === 'number' ? ep.event_type : 0,
+                  header: ep.header,
+                  title: e.title,
+                  start_time: e.startStr,
+                  end_time: e.endStr,
+                  color: e.backgroundColor || undefined,
+                  notes: ep.notes,
+                  linked_event_id: undefined,
+                  recurring_event_id: undefined,
+                }
+                setSelected(mapped)
+                const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+                const userIdFromToken = token ? Number((parseJwt(token)?.sub as any) ?? 0) : 0
+                setIsOwner(mapped.user_id === userIdFromToken)
+              }}
             />
             {toolbarRightEl && createPortal(
               <div className="relative">
@@ -177,6 +207,21 @@ export default function Calendar() {
           </section>
         </div>
       </main>
+      <EventModal
+        event={selected}
+        isOwner={isOwner}
+        open={!!selected}
+        onClose={() => {
+          setSelected(null)
+          // After save, refetch events for current visible range
+          const api = calendarRef.current?.getApi()
+          if (api) {
+            const view = api.view
+            // trigger datesSet manually
+            handleDatesSet({ start: view.activeStart, end: view.activeEnd })
+          }
+        }}
+      />
     </div>
   )
 }

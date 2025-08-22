@@ -39,3 +39,15 @@ export interface EventResponse {
   linked_event_id?: number | null;
   recurring_event_id?: number | null;
 }
+
+export interface EventUpdate {
+  event_type?: string; // text class name per backend expectations
+  header?: string | null;
+  title?: string;
+  start_time?: string;
+  end_time?: string;
+  color?: string | null;
+  notes?: string | null;
+  linked_event_id?: number | null;
+  recurring_event_id?: number | null;
+}
