@@ -12,6 +12,7 @@ import { getEvents } from '../lib/events'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { EventResponse } from '../types/api'
 import EventModal from '../components/EventModal'
+import CreateEventModal from '../components/CreateEventModal'
 import { parseJwt } from '../utils/jwt'
 // CSS loaded via CDN in index.html to avoid import-analysis issues
 
@@ -33,6 +34,7 @@ export default function Calendar() {
   // const [isLoading, setIsLoading] = useState(false)
   const [selected, setSelected] = useState<EventResponse | null>(null)
   const [isOwner, setIsOwner] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const viewOptions: { id: string; label: string }[] = [
     { id: 'multiMonthYear', label: 'Year' },
@@ -127,7 +129,7 @@ export default function Calendar() {
         <div className="flex items-stretch gap-6">
           {/* Left panel (smaller section) */}
           <aside className="w-45 shrink-0 rounded-xl bg-[#FAF0DC] text-[#FAF0DC] p-3 flex flex-col justify-center space-y-20">
-            <button className="w-full inline-flex items-center justify-center gap-3 rounded-xl text-lg bg-[#633D00] text-[#FAF0DC] font-medium px-4 py-4 transition-colors hover:bg-[#765827] shadow-xl">
+            <button onClick={() => setCreateOpen(true)} className="w-full inline-flex items-center justify-center gap-3 rounded-xl text-lg bg-[#633D00] text-[#FAF0DC] font-medium px-4 py-4 transition-colors hover:bg-[#765827] shadow-xl">
               <img src="/icons/plus_icon.svg" alt="Create" className="h-5 w-5" />
               <span>Create</span>
             </button>
@@ -218,6 +220,17 @@ export default function Calendar() {
           if (api) {
             const view = api.view
             // trigger datesSet manually
+            handleDatesSet({ start: view.activeStart, end: view.activeEnd })
+          }
+        }}
+      />
+      <CreateEventModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => {
+          const api = calendarRef.current?.getApi()
+          if (api) {
+            const view = api.view
             handleDatesSet({ start: view.activeStart, end: view.activeEnd })
           }
         }}

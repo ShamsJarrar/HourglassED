@@ -199,7 +199,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
 
         <div className="space-y-3 text-[#633D00] flex-1 overflow-y-auto no-scrollbar">
           <div>
-            <label className="block text-sm mb-1">Type</label>
+            <label className="block text-sm mb-1">Type *</label>
             {readOnly ? (
               <div className="rounded-md border border-[#633D00] px-3 py-2 bg-white">
                 {classNameById.get(event.event_type) ?? (selectedClassName || '—')}
@@ -237,18 +237,26 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm mb-1">Header</label>
-            <input value={header ?? ''} onChange={(e) => setHeader(e.target.value)} disabled={readOnly} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+            <label className="text-sm mb-1 flex items-center">
+              <span>Header</span>
+              <img
+                src="/icons/info_icon.svg"
+                alt="info"
+                title="Capitalized part of the title (max. 15 chars)"
+                className="ml-1 h-4 w-4 opacity-80"
+              />
+            </label>
+            <input maxLength={15} value={header ?? ''} onChange={(e) => setHeader(e.target.value)} disabled={readOnly} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
           </div>
 
           <div>
-            <label className="block text-sm mb-1">Title</label>
+            <label className="block text-sm mb-1">Title *</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} disabled={readOnly} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm mb-1">Start</label>
+              <label className="block text-sm mb-1">Start *</label>
               {readOnly ? (
                 <div className="rounded-md border border-[#633D00] px-3 py-2 bg-white">
                   {new Date(event.start_time).toLocaleString()}
@@ -263,7 +271,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               )}
             </div>
             <div>
-              <label className="block text-sm mb-1">End</label>
+              <label className="block text-sm mb-1">End *</label>
               {readOnly ? (
                 <div className="rounded-md border border-[#633D00] px-3 py-2 bg-white">
                   {new Date(event.end_time).toLocaleString()}
@@ -294,9 +302,14 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                 onChange={(e) => setColor(e.target.value)}
                 disabled={readOnly}
                 className="flex-1 rounded-md border border-[#633D00] px-3 py-2 bg-white"
-                placeholder="#FFD700 or FFD700"
+                placeholder="#FFD700"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1">Recurrence</label>
+            <input disabled value="Not implemented yet" className="w-full rounded-md border border-[#633D00]/40 bg-[#f5efe2] px-3 py-2 text-[#633D00]/70" />
           </div>
 
           <div>

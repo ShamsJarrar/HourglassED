@@ -1,5 +1,5 @@
 import api from "./api";
-import type { EventResponse, EventUpdate } from "../types/api";
+import type { EventResponse, EventUpdate, EventCreate } from "../types/api";
 
 export interface GetEventsParams {
   start_time?: string;
@@ -40,4 +40,9 @@ export async function removeUserFromEvent(eventId: number, invitedUserId: number
 
 export async function withdrawFromEvent(eventId: number): Promise<void> {
   await api.delete(`/event/${eventId}/withdraw`);
+}
+
+export async function createEvent(body: EventCreate): Promise<EventResponse> {
+  const res = await api.post<EventResponse>(`/event/`, body);
+  return res.data;
 }
