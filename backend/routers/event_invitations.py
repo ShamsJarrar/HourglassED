@@ -53,7 +53,8 @@ def invite_user_to_event(
     
     exists = db.query(EventInvitation).filter(
         EventInvitation.event_id == event_invite.event_id,
-        EventInvitation.invited_user_id == event_invite.invited_user_id
+        EventInvitation.invited_user_id == event_invite.invited_user_id,
+        EventInvitation.status.in_([EventInvitationStatus.pending, EventInvitationStatus.accepted])
     ).first()
 
     if exists:

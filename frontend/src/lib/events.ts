@@ -33,3 +33,7 @@ export async function updateEvent(eventId: number, body: EventUpdate): Promise<E
 export async function deleteEventById(eventId: number): Promise<void> {
   await api.delete(`/event/${eventId}`);
 }
+
+export async function removeUserFromEvent(eventId: number, invitedUserId: number): Promise<void> {
+  await api.delete(`/event/${eventId}/remove/${invitedUserId}`);
+}

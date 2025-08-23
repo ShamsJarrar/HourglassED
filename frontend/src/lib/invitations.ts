@@ -34,3 +34,7 @@ export async function createInvitation(body: CreateInvitationBody) {
   const res = await api.post(`/invitations/`, body);
   return res.data;
 }
+
+export async function cancelInvitation(invitationId: number): Promise<void> {
+  await api.delete(`/invitations/${invitationId}`);
+}

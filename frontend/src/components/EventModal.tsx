@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventResponse, InvitationStatus } from '../types/api'
-import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse } from '../lib/events'
+import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent } from '../lib/events'
 import type { EventUpdate } from '../types/api'
-import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation } from '../lib/invitations'
+import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation, cancelInvitation } from '../lib/invitations'
 import { getFriendById, getFriendsList, type FriendsListResponseItem } from '../lib/friends'
 
 type InvitationRow = {
@@ -10,6 +10,7 @@ type InvitationRow = {
   status: InvitationStatus | string
   userName: string
   userEmail: string
+  invitedUserId?: number | null
 }
 
 interface Props {
@@ -36,6 +37,8 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
   const [friends, setFriends] = useState<FriendsListResponseItem[] | null>(null)
   const [selectedFriendId, setSelectedFriendId] = useState<number | ''>('')
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
+  const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null)
+  const [actionLoadingFor, setActionLoadingFor] = useState<number | null>(null)
   
 
   useEffect(() => {
@@ -79,6 +82,44 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
     
   }, [event, classNameById])
 
+  // helper to load invitations and map to rows
+  async function fetchAndSetInvitations(currentEvent: EventResponse) {
+    const sent = await getSentInvitations({ event_id: currentEvent.event_id })
+    const rows: InvitationRow[] = await Promise.all(
+      sent.map(async (inv) => {
+        let friendId = inv.invited_user_id
+        if (friendId != null) {
+          try {
+            const f = await getFriendById(friendId)
+            return {
+              invitationId: inv.invitation_id,
+              status: inv.status,
+              userName: f.friend_name,
+              userEmail: f.friend_email,
+              invitedUserId: friendId,
+            }
+          } catch {}
+        }
+        const email = inv.invited_user?.email
+        // Try to derive friend id from loaded friends list by email if available
+        if (!friendId && email && friends && Array.isArray(friends)) {
+          const match = friends.find((fr) => fr.friend_email.toLowerCase() === email.toLowerCase())
+          if (match?.friend_id != null) {
+            friendId = match.friend_id
+          }
+        }
+        return {
+          invitationId: inv.invitation_id,
+          status: inv.status,
+          userName: email ? email.split('@')[0] : 'Unknown user',
+          userEmail: email ?? '—',
+          invitedUserId: friendId ?? null,
+        }
+      })
+    )
+    setInvitations(rows)
+  }
+
   // Fetch invitations for owners when modal opens
   useEffect(() => {
     let isCancelled = false
@@ -89,33 +130,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
       }
       setInvitations(null)
       try {
-        const sent = await getSentInvitations({ event_id: event.event_id })
-        const rows: InvitationRow[] = await Promise.all(
-          sent.map(async (inv) => {
-            const friendId = inv.invited_user_id
-            if (friendId != null) {
-              try {
-                const f = await getFriendById(friendId)
-                return {
-                  invitationId: inv.invitation_id,
-                  status: inv.status,
-                  userName: f.friend_name,
-                  userEmail: f.friend_email,
-                }
-              } catch {
-                // fallback if friend fetch fails
-              }
-            }
-            const email = inv.invited_user?.email
-            return {
-              invitationId: inv.invitation_id,
-              status: inv.status,
-              userName: email ? email.split('@')[0] : 'Unknown user',
-              userEmail: email ?? '—',
-            }
-          })
-        )
-        if (!isCancelled) setInvitations(rows)
+        if (!isCancelled) await fetchAndSetInvitations(event)
       } catch (e) {
         if (!isCancelled) setInvitations([])
       }
@@ -124,7 +139,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
     return () => {
       isCancelled = true
     }
-  }, [open, isOwner, event])
+  }, [open, isOwner, event, friends])
 
   // Fetch participants for non-owners when modal opens
   useEffect(() => {
@@ -298,14 +313,71 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               ) : (
                 <ul className="space-y-2">
                   {invitations.map((inv) => (
-                    <li key={inv.invitationId} className="flex items-start justify-between gap-3 rounded-md border border-[#633D00]/30 bg-white px-3 py-2">
+                    <li key={inv.invitationId} className="flex items-start justify-between gap-3 rounded-md border border-[#633D00]/30 bg-white px-3 py-2 relative">
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{inv.userName}</div>
                         <div className="text-xs text-[#633D00]/70 truncate">{inv.userEmail}</div>
                       </div>
-                      <div className="text-sm whitespace-nowrap">
-                        <span className="text-[#633D00]/80">status: </span>
-                        <span className="uppercase tracking-wide text-[#633D00]">{String(inv.status)}</span>
+                      <div className="text-sm whitespace-nowrap flex items-center gap-2">
+                        <div>
+                          <span className="text-[#633D00]/80">status: </span>
+                          <span className="uppercase tracking-wide text-[#633D00]">{String(inv.status)}</span>
+                        </div>
+                        {(String(inv.status) === 'pending' || String(inv.status) === 'accepted') && (
+                          <>
+                            <button
+                              className="p-1 hover:bg-[#633D00]/10 rounded"
+                              onClick={() => setMenuOpenFor(menuOpenFor === inv.invitationId ? null : inv.invitationId)}
+                              aria-label="More actions"
+                            >
+                              <img src="/icons/horizontal_dots_icon.svg" alt="actions" className="h-4 w-4" />
+                            </button>
+                            {menuOpenFor === inv.invitationId && (
+                              <div className="absolute right-2 top-10 z-10 w-44 rounded-md border border-[#633D00]/30 bg-white shadow">
+                                {String(inv.status) === 'pending' && (
+                                  <button
+                                    disabled={actionLoadingFor === inv.invitationId}
+                                    onClick={async () => {
+                                      if (!event) return
+                                      try {
+                                        setActionLoadingFor(inv.invitationId)
+                                        await cancelInvitation(inv.invitationId)
+                                        await fetchAndSetInvitations(event)
+                                      } catch {}
+                                      finally {
+                                        setActionLoadingFor(null)
+                                        setMenuOpenFor(null)
+                                      }
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-[#633D00]/10"
+                                  >
+                                    {actionLoadingFor === inv.invitationId ? 'Cancelling…' : 'Cancel invite'}
+                                  </button>
+                                )}
+                                {String(inv.status) === 'accepted' && (
+                                  <button
+                                    disabled={actionLoadingFor === inv.invitationId || !inv.invitedUserId}
+                                    onClick={async () => {
+                                      if (!event || !inv.invitedUserId) return
+                                      try {
+                                        setActionLoadingFor(inv.invitationId)
+                                        await removeUserFromEvent(event.event_id, inv.invitedUserId)
+                                        await fetchAndSetInvitations(event)
+                                      } catch {}
+                                      finally {
+                                        setActionLoadingFor(null)
+                                        setMenuOpenFor(null)
+                                      }
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-[#633D00]/10"
+                                  >
+                                    {actionLoadingFor === inv.invitationId ? 'Removing…' : 'Remove from event'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -329,22 +401,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                     try {
                       setInviteSubmitting(true)
                       await createInvitation({ event_id: event.event_id, invited_user_id: Number(selectedFriendId) })
-                      // refresh invitations list
-                      const sent = await getSentInvitations({ event_id: event.event_id })
-                      const rows: InvitationRow[] = await Promise.all(
-                        sent.map(async (inv) => {
-                          const friendId = inv.invited_user_id
-                          if (friendId != null) {
-                            try {
-                              const f = await getFriendById(friendId)
-                              return { invitationId: inv.invitation_id, status: inv.status, userName: f.friend_name, userEmail: f.friend_email }
-                            } catch {}
-                          }
-                          const email = inv.invited_user?.email
-                          return { invitationId: inv.invitation_id, status: inv.status, userName: email ? email.split('@')[0] : 'Unknown user', userEmail: email ?? '—' }
-                        })
-                      )
-                      setInvitations(rows)
+                      await fetchAndSetInvitations(event)
                       setSelectedFriendId('')
                     } catch (e) {
                       // silently fail to UI; could add toast
