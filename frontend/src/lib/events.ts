@@ -37,3 +37,7 @@ export async function deleteEventById(eventId: number): Promise<void> {
 export async function removeUserFromEvent(eventId: number, invitedUserId: number): Promise<void> {
   await api.delete(`/event/${eventId}/remove/${invitedUserId}`);
 }
+
+export async function withdrawFromEvent(eventId: number): Promise<void> {
+  await api.delete(`/event/${eventId}/withdraw`);
+}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventResponse, InvitationStatus } from '../types/api'
-import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent } from '../lib/events'
+import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent, withdrawFromEvent } from '../lib/events'
 import type { EventUpdate } from '../types/api'
 import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation, cancelInvitation } from '../lib/invitations'
 import { getFriendById, getFriendsList, type FriendsListResponseItem } from '../lib/friends'
@@ -459,6 +459,23 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               className="rounded-md border border-red-700 text-red-700 px-4 py-2 hover:bg-red-50"
             >
               Delete
+            </button>
+          )}
+          {!isOwner && (
+            <button
+              onClick={async () => {
+                if (!event) return
+                if (!confirm('Withdraw from this event?')) return
+                try {
+                  await withdrawFromEvent(event.event_id)
+                  onClose()
+                } catch (e) {
+                  console.error('Failed to withdraw', e)
+                }
+              }}
+              className="rounded-md border border-red-700 text-red-700 px-4 py-2 hover:bg-red-50"
+            >
+              Withdraw
             </button>
           )}
           {isOwner && (
