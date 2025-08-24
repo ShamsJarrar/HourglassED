@@ -3,6 +3,7 @@ import type { EventCreate } from '../types/api'
 import { getEventClasses, type EventClassResponse, createEvent } from '../lib/events'
 import { getFriendsList, type FriendsListResponseItem } from '../lib/friends'
 import { createInvitation } from '../lib/invitations'
+import { useToast } from './Toast'
 
 interface Props {
   open: boolean
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function CreateEventModal({ open, onClose, onCreated }: Props) {
+  const { show } = useToast()
   const [classes, setClasses] = useState<EventClassResponse[]>([])
   const [selectedClassName, setSelectedClassName] = useState<string>('')
   const [useCustomType, setUseCustomType] = useState<boolean>(false)
@@ -286,12 +288,21 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
                   for (const f of inviteQueue) {
                     try {
                       await createInvitation({ event_id: created.event_id, invited_user_id: f.friend_id })
-                    } catch {}
+                    } catch (e: any) {
+                      const status = e?.response?.status
+                      if (status === 400) show('Invalid invitation request', 'warning')
+                      else if (status === 403) show('Not authorized to invite one or more users', 'error')
+                      else if (status === 404) show('Event or user not found for an invite', 'warning')
+                      else show('Failed to send one or more invitations', 'error')
+                    }
                   }
                   onClose()
                   onCreated?.()
-                } catch (e) {
-                  console.error('Failed to create event', e)
+                } catch (e: any) {
+                  const status = e?.response?.status
+                  if (status === 400) show('Invalid event data', 'warning')
+                  else if (status === 403) show('You are not authorized to create events', 'error')
+                  else show('Failed to create event', 'error')
                 } finally {
                   setSubmitting(false)
                 }

@@ -4,6 +4,7 @@ import './index.css'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import ProtectedRoute from './routes/ProtectedRoute'
 import Calendar from './pages/Calendar'
+import { ToastProvider } from './components/Toast'
 import Invitations from './pages/Invitations'
 import Friends from './pages/Friends'
 import Login from './pages/Login'
@@ -32,7 +33,9 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
   </StrictMode>,
 )
 

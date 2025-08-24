@@ -4,6 +4,7 @@ import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse,
 import type { EventUpdate } from '../types/api'
 import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation, cancelInvitation } from '../lib/invitations'
 import { getFriendById, getFriendsList, type FriendsListResponseItem } from '../lib/friends'
+import { useToast } from './Toast'
 
 type InvitationRow = {
   invitationId: number
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function EventModal({ event, isOwner, open, onClose }: Props) {
+  const { show } = useToast()
   const [classes, setClasses] = useState<EventClassResponse[]>([])
   const [title, setTitle] = useState('')
   const [header, setHeader] = useState<string | undefined>('')
@@ -384,7 +386,13 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                                         setActionLoadingFor(inv.invitationId)
                                         await cancelInvitation(inv.invitationId)
                                         await fetchAndSetInvitations(event)
-                                      } catch {}
+                                      } catch (e: any) {
+                                        const status = e?.response?.status
+                                        if (status === 403) show('Not authorized to cancel', 'error')
+                                        else if (status === 404) show('Invitation not found', 'warning')
+                                        else if (status === 400) show('Cannot cancel non-pending invite', 'warning')
+                                        else show('Failed to cancel invite', 'error')
+                                      }
                                       finally {
                                         setActionLoadingFor(null)
                                         setMenuOpenFor(null)
@@ -404,7 +412,12 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                                         setActionLoadingFor(inv.invitationId)
                                         await removeUserFromEvent(event.event_id, inv.invitedUserId)
                                         await fetchAndSetInvitations(event)
-                                      } catch {}
+                                      } catch (e: any) {
+                                        const status = e?.response?.status
+                                        if (status === 403) show('Not authorized to remove user', 'error')
+                                        else if (status === 404) show('User not sharer or not found', 'warning')
+                                        else show('Failed to remove user', 'error')
+                                      }
                                       finally {
                                         setActionLoadingFor(null)
                                         setMenuOpenFor(null)
@@ -444,8 +457,12 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                       await createInvitation({ event_id: event.event_id, invited_user_id: Number(selectedFriendId) })
                       await fetchAndSetInvitations(event)
                       setSelectedFriendId('')
-                    } catch (e) {
-                      // silently fail to UI; could add toast
+                    } catch (e: any) {
+                      const status = e?.response?.status
+                      if (status === 400) show('Invalid invitation request', 'warning')
+                      else if (status === 403) show('You are not authorized to invite this user', 'error')
+                      else if (status === 404) show('Event or user not found', 'warning')
+                      else show('Failed to send invitation', 'error')
                     } finally {
                       setInviteSubmitting(false)
                     }

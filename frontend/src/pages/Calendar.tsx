@@ -15,6 +15,7 @@ import EventModal from '../components/EventModal'
 import CreateEventModal from '../components/CreateEventModal'
 import FiltersModal from '../components/FiltersModal'
 import { parseJwt } from '../utils/jwt'
+import { useToast } from '../components/Toast'
 // CSS loaded via CDN in index.html to avoid import-analysis issues
 
 export default function Calendar() {
@@ -38,6 +39,7 @@ export default function Calendar() {
   const [createOpen, setCreateOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [filters, setFilters] = useState<{ owned_only?: boolean; event_types?: number[] | null }>({})
+  const { show } = useToast()
 
   const viewOptions: { id: string; label: string }[] = [
     { id: 'multiMonthYear', label: 'Year' },
