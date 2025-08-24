@@ -93,6 +93,8 @@ export default function Calendar() {
           event_type: e.event_type,
           user_id: e.user_id,
           notes: e.notes ?? undefined,
+          raw_start_time: e.start_time,
+          raw_end_time: e.end_time,
         },
         }
       })
@@ -166,8 +168,8 @@ export default function Calendar() {
                   event_type: typeof ep.event_type === 'number' ? ep.event_type : 0,
                   header: ep.header,
                   title: e.title,
-                  start_time: e.startStr,
-                  end_time: e.endStr,
+                  start_time: typeof ep.raw_start_time === 'string' ? ep.raw_start_time : e.startStr,
+                  end_time: typeof ep.raw_end_time === 'string' ? ep.raw_end_time : e.endStr,
                   color: e.backgroundColor || undefined,
                   notes: ep.notes,
                   linked_event_id: undefined,

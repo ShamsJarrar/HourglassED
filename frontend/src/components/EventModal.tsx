@@ -67,15 +67,14 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
     setUseCustomType(false)
     setCustomTypeName('')
     // initialize editable start/end values
+    const ensureUtcIso = (value: string) => {
+      // If backend sends naive ISO (no timezone), treat it as UTC
+      return /([zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`
+    }
     const toLocalInput = (iso: string) => {
-      const d = new Date(iso)
-      const pad = (n: number) => String(n).padStart(2, '0')
-      const yyyy = d.getFullYear()
-      const MM = pad(d.getMonth() + 1)
-      const dd = pad(d.getDate())
-      const hh = pad(d.getHours())
-      const mm = pad(d.getMinutes())
-      return `${yyyy}-${MM}-${dd}T${hh}:${mm}`
+      const d = new Date(ensureUtcIso(iso))
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      return local.toISOString().slice(0, 16)
     }
     setStartLocal(toLocalInput(event.start_time))
     setEndLocal(toLocalInput(event.end_time))
@@ -259,7 +258,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               <label className="block text-sm mb-1">Start *</label>
               {readOnly ? (
                 <div className="rounded-md border border-[#633D00] px-3 py-2 bg-white">
-                  {new Date(event.start_time).toLocaleString()}
+                  {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.start_time))}
                 </div>
               ) : (
                 <input
@@ -274,7 +273,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               <label className="block text-sm mb-1">End *</label>
               {readOnly ? (
                 <div className="rounded-md border border-[#633D00] px-3 py-2 bg-white">
-                  {new Date(event.end_time).toLocaleString()}
+                  {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.end_time))}
                 </div>
               ) : (
                 <input
