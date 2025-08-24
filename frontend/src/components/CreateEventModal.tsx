@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventCreate } from '../types/api'
 import { getEventClasses, type EventClassResponse, createEvent } from '../lib/events'
+import { getFriendsList, type FriendsListResponseItem } from '../lib/friends'
+import { createInvitation } from '../lib/invitations'
 
 interface Props {
   open: boolean
@@ -20,6 +22,13 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
   const [color, setColor] = useState<string | undefined>('')
   const [notes, setNotes] = useState<string | undefined>('')
   const [submitting, setSubmitting] = useState(false)
+  const [friends, setFriends] = useState<FriendsListResponseItem[] | null>(null)
+  const [selectedFriendId, setSelectedFriendId] = useState<number | ''>('')
+  const [inviteQueue, setInviteQueue] = useState<FriendsListResponseItem[]>([])
+  const availableFriends = useMemo(
+    () => (friends ?? []).filter((f) => !inviteQueue.some((q) => q.friend_id === f.friend_id)),
+    [friends, inviteQueue]
+  )
 
   useEffect(() => {
     if (!open) return
@@ -31,6 +40,20 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
         }
       })
       .catch(() => setClasses([]))
+  }, [open])
+
+  // Load friends list for invitations
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    getFriendsList()
+      .then((list) => {
+        if (!cancelled) setFriends(list)
+      })
+      .catch(() => {
+        if (!cancelled) setFriends([])
+      })
+    return () => { cancelled = true }
   }, [open])
 
   useEffect(() => {
@@ -168,6 +191,57 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
               <label className="block text-sm mb-1">Notes</label>
               <textarea value={notes ?? ''} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white min-h-24" />
             </div>
+
+            <div className="pt-3 border-t border-[#633D00]/30">
+              <label className="block text-sm font-medium mb-2">Invitations</label>
+              <div className="text-xs text-[#633D00]/70 mb-2">Invitations will be sent after the event is created.</div>
+              {inviteQueue.length > 0 && (
+                <ul className="mb-2 space-y-2">
+                  {inviteQueue.map((f) => (
+                    <li key={f.friend_id} className="flex items-center justify-between gap-3 rounded-md border border-[#633D00]/30 bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{f.friend_name}</div>
+                        <div className="text-xs text-[#633D00]/70 truncate">{f.friend_email}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInviteQueue((prev) => prev.filter((x) => x.friend_id !== f.friend_id))}
+                        className="rounded-md border border-red-700 text-red-700 px-2 py-1 hover:bg-red-50 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedFriendId === '' ? '' : String(selectedFriendId)}
+                  onChange={(e) => setSelectedFriendId(e.target.value ? Number(e.target.value) : '')}
+                  className="flex-1 rounded-md border border-[#633D00] px-3 py-2 bg-white"
+                >
+                  <option value="">Select a friend…</option>
+                  {availableFriends.map((f) => (
+                    <option key={f.friend_id} value={f.friend_id}>{`${f.friend_name} — ${f.friend_email}`}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={selectedFriendId === '' || inviteQueue.some((q) => q.friend_id === selectedFriendId)}
+                  onClick={() => {
+                    if (selectedFriendId === '') return
+                    const f = (friends ?? []).find((x) => x.friend_id === selectedFriendId)
+                    if (!f) return
+                    if (inviteQueue.some((q) => q.friend_id === f.friend_id)) return
+                    setInviteQueue((prev) => [...prev, f])
+                    setSelectedFriendId('')
+                  }}
+                  className="rounded-md bg-[#633D00] text-[#FAF0DC] px-4 py-2 hover:bg-[#765827] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="mt-8 flex justify-end gap-3">
@@ -191,7 +265,13 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
                 }
                 try {
                   setSubmitting(true)
-                  await createEvent(body)
+                  const created = await createEvent(body)
+                  // Send invitations in sequence (could be parallel if needed)
+                  for (const f of inviteQueue) {
+                    try {
+                      await createInvitation({ event_id: created.event_id, invited_user_id: f.friend_id })
+                    } catch {}
+                  }
                   onClose()
                   onCreated?.()
                 } catch (e) {
