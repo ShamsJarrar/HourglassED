@@ -83,6 +83,12 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
 
   if (!open) return null
 
+  const basicColors = [
+    '#FFD700', '#FF8C00', '#FF4D4D', '#00C853',
+    '#1E90FF', '#8A2BE2', '#FF69B4', '#00CED1',
+    '#795548', '#9E9E9E', '#000000', '#FFFFFF',
+  ]
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30" onClick={onClose}>
       <div className="w-[520px] max-w-[92vw] max-h-[86vh] rounded-xl bg-[#FFF8EB] border-2 border-[#633D00] shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -166,19 +172,29 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
 
             <div>
               <label className="block text-sm mb-1">Color</label>
+              <div className="grid grid-cols-8 gap-2 mb-2">
+                {basicColors.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`h-6 w-6 rounded-sm border ${(((color ?? '').startsWith('#') ? (color ?? '') : `#${color ?? ''}`).toUpperCase() === c.toUpperCase()) ? 'ring-2 ring-[#633D00]' : 'border-[#633D00]/40'}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Choose color ${c}`}
+                    title={c}
+                  />
+                ))}
+              </div>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
                   value={(color?.startsWith('#') ? color : `#${color ?? 'ffffff'}`)}
                   onChange={(e) => setColor(e.target.value)}
                   className="h-9 w-9 rounded-md border border-[#633D00] bg-white"
+                  title="Custom color"
+                  aria-label="Custom color"
                 />
-                <input
-                  value={color ?? ''}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="flex-1 rounded-md border border-[#633D00] px-3 py-2 bg-white"
-                  placeholder="#FFD700"
-                />
+                <span className="text-xs text-[#633D00]/70">Custom</span>
               </div>
             </div>
 

@@ -39,6 +39,19 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
   const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null)
   const [actionLoadingFor, setActionLoadingFor] = useState<number | null>(null)
+  const availableFriends = useMemo(() => {
+    if (!friends) return [] as FriendsListResponseItem[]
+    const blockedIds = new Set<number>()
+    const blockedEmails = new Set<string>()
+    ;(invitations ?? []).forEach((inv) => {
+      const status = String(inv.status)
+      if (status === 'pending' || status === 'accepted') {
+        if (inv.invitedUserId != null) blockedIds.add(inv.invitedUserId)
+        if (inv.userEmail) blockedEmails.add(inv.userEmail.toLowerCase())
+      }
+    })
+    return friends.filter((f) => !blockedIds.has(f.friend_id) && !blockedEmails.has(f.friend_email.toLowerCase()))
+  }, [friends, invitations])
   
 
   useEffect(() => {
@@ -186,6 +199,11 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
   if (!open || !event) return null
 
   const readOnly = !isOwner
+  const basicColors = [
+    '#FFD700', '#FF8C00', '#FF4D4D', '#00C853',
+    '#1E90FF', '#8A2BE2', '#FF69B4', '#00CED1',
+    '#795548', '#9E9E9E', '#000000', '#FFFFFF',
+  ]
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30" onClick={onClose}>
@@ -288,6 +306,21 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
 
           <div>
             <label className="block text-sm mb-1">Color</label>
+            {!readOnly && (
+              <div className="grid grid-cols-8 gap-2 mb-2">
+                {basicColors.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`h-6 w-6 rounded-sm border ${(((color ?? '').startsWith('#') ? (color ?? '') : `#${color ?? ''}`).toUpperCase() === c.toUpperCase()) ? 'ring-2 ring-[#633D00]' : 'border-[#633D00]/40'}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Choose color ${c}`}
+                    title={c}
+                  />
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <input
                 type="color"
@@ -295,14 +328,10 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                 onChange={(e) => setColor(e.target.value)}
                 disabled={readOnly}
                 className="h-9 w-9 rounded-md border border-[#633D00] bg-white"
+                title="Custom color"
+                aria-label="Custom color"
               />
-              <input
-                value={color ?? ''}
-                onChange={(e) => setColor(e.target.value)}
-                disabled={readOnly}
-                className="flex-1 rounded-md border border-[#633D00] px-3 py-2 bg-white"
-                placeholder="#FFD700"
-              />
+              {!readOnly && <span className="text-xs text-[#633D00]/70">Custom</span>}
             </div>
           </div>
 
@@ -402,7 +431,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
                   className="flex-1 rounded-md border border-[#633D00] px-3 py-2 bg-white"
                 >
                   <option value="">Select a friend…</option>
-                  {(friends ?? []).map((f) => (
+                  {availableFriends.map((f) => (
                     <option key={f.friend_id} value={f.friend_id}>{`${f.friend_name} — ${f.friend_email}`}</option>
                   ))}
                 </select>
