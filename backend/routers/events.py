@@ -56,7 +56,8 @@ def create_event(
 def get_user_events(
     start_time: Optional[datetime] = Query(None),
     end_time: Optional[datetime] = Query(None),
-    event_type: Optional[int] = Query(None),
+    event_types: Optional[List[int]] = Query(None),
+    event_types_alt: Optional[List[int]] = Query(None, alias='event_types[]'),
     owned_only: Optional[bool] = Query(False),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
@@ -74,8 +75,10 @@ def get_user_events(
             filters.append(Event.end_time > start_time)
         if end_time is not None:
             filters.append(Event.start_time < end_time)
-    if event_type is not None:
-        filters.append(Event.event_type == event_type)
+    # Filter by any of the selected event types if provided (support 'event_types' and 'event_types[]')
+    selected_types = event_types or event_types_alt
+    if selected_types:
+        filters.append(Event.event_type.in_(selected_types))
 
     user_events = db.query(Event).filter(
         Event.user_id == user.user_id,

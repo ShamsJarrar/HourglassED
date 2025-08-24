@@ -13,6 +13,7 @@ import type { EventContentArg } from '@fullcalendar/core'
 import type { EventResponse } from '../types/api'
 import EventModal from '../components/EventModal'
 import CreateEventModal from '../components/CreateEventModal'
+import FiltersModal from '../components/FiltersModal'
 import { parseJwt } from '../utils/jwt'
 // CSS loaded via CDN in index.html to avoid import-analysis issues
 
@@ -35,6 +36,8 @@ export default function Calendar() {
   const [selected, setSelected] = useState<EventResponse | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState<{ owned_only?: boolean; event_types?: number[] | null }>({})
 
   const viewOptions: { id: string; label: string }[] = [
     { id: 'multiMonthYear', label: 'Year' },
@@ -57,12 +60,27 @@ export default function Calendar() {
     if (el) setToolbarRightEl(el)
   }, [])
 
+  // Refetch events whenever filters change
+  useEffect(() => {
+    const api = calendarRef.current?.getApi()
+    if (api) {
+      const view = api.view
+      // Trigger fetch with the current visible range and latest filters
+      handleDatesSet({ start: view.activeStart, end: view.activeEnd })
+    }
+  }, [filters])
+
   // Fetch events when the calendar date range changes
   const handleDatesSet = async (arg: { start: Date; end: Date }) => {
     try {
       const startIso = arg.start.toISOString()
       const endIso = arg.end.toISOString()
-      const data: EventResponse[] = await getEvents({ start_time: startIso, end_time: endIso })
+      const data: EventResponse[] = await getEvents({
+        start_time: startIso,
+        end_time: endIso,
+        ...(filters.owned_only ? { owned_only: true } : {}),
+        ...(filters.event_types && filters.event_types.length ? { event_types: filters.event_types } : {}),
+      })
       const mapped = data.map((e) => {
         const normalizeHex = (val?: string) => {
           if (!val) return undefined
@@ -135,7 +153,7 @@ export default function Calendar() {
               <img src="/icons/plus_icon.svg" alt="Create" className="h-5 w-5" />
               <span>Create</span>
             </button>
-            <button className="w-10/12 self-center inline-flex items-center justify-center gap-3 rounded-xl bg-[#FAF0DC] text-[#633D00] font-medium px-4 py-3 transition-colors hover:bg-[#ead9be] border-1 border-[#633D00]">
+            <button onClick={() => setFiltersOpen(true)} className="w-10/12 self-center inline-flex items-center justify-center gap-3 rounded-xl bg-[#FAF0DC] text-[#633D00] font-medium px-4 py-3 transition-colors hover:bg-[#ead9be] border-1 border-[#633D00]">
               <img src="/icons/filter_icon.svg" alt="Filters" className="h-4 w-4" />
               <span>Filters</span>
             </button>
@@ -230,6 +248,19 @@ export default function Calendar() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => {
+          const api = calendarRef.current?.getApi()
+          if (api) {
+            const view = api.view
+            handleDatesSet({ start: view.activeStart, end: view.activeEnd })
+          }
+        }}
+      />
+      <FiltersModal
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        value={filters}
+        onChange={(next) => {
+          setFilters(next)
           const api = calendarRef.current?.getApi()
           if (api) {
             const view = api.view

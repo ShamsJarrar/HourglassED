@@ -4,7 +4,7 @@ import type { EventResponse, EventUpdate, EventCreate } from "../types/api";
 export interface GetEventsParams {
   start_time?: string;
   end_time?: string;
-  event_type?: number;
+  event_types?: number[];
   owned_only?: boolean;
 }
 
