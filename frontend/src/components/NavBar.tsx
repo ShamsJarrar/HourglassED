@@ -15,6 +15,7 @@ export default function NavBar({ onRefresh }: Props) {
   const [friendsModalOpen, setFriendsModalOpen] = useState(false)
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false)
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
+  const [friendsModalActiveTab, setFriendsModalActiveTab] = useState<'friends' | 'send' | 'received'>('friends')
 
   // Check for unread notifications on page load and refresh
   useEffect(() => {
@@ -47,6 +48,16 @@ export default function NavBar({ onRefresh }: Props) {
       checkUnreadNotifications()
     }
   }, [notificationsModalOpen])
+
+  // Functions to handle opening modals from notifications
+  const handleOpenFriendsModal = () => {
+    setFriendsModalActiveTab('received')
+    setFriendsModalOpen(true)
+  }
+
+  const handleOpenInvitationsModal = () => {
+    setInvitationsModalOpen(true)
+  }
 
   return (
     <>
@@ -105,6 +116,7 @@ export default function NavBar({ onRefresh }: Props) {
         open={friendsModalOpen} 
         onClose={() => setFriendsModalOpen(false)}
         onRefresh={onRefresh}
+        activeTab={friendsModalActiveTab}
       />
       <NotificationsModal 
         open={notificationsModalOpen} 
@@ -123,6 +135,8 @@ export default function NavBar({ onRefresh }: Props) {
           }
           checkUnreadNotifications()
         }}
+        onOpenFriendsModal={handleOpenFriendsModal}
+        onOpenInvitationsModal={handleOpenInvitationsModal}
       />
     </>
   )

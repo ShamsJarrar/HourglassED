@@ -8,9 +8,11 @@ interface Props {
   onClose: () => void
   onRefresh?: () => void
   onNotificationRead?: () => void
+  onOpenFriendsModal?: () => void
+  onOpenInvitationsModal?: () => void
 }
 
-export default function NotificationsModal({ open, onClose, onRefresh, onNotificationRead }: Props) {
+export default function NotificationsModal({ open, onClose, onRefresh, onNotificationRead, onOpenFriendsModal, onOpenInvitationsModal }: Props) {
   const { show } = useToast()
   const [notifications, setNotifications] = useState<Notification[] | null>(null)
   const [markAsReadLoading, setMarkAsReadLoading] = useState<Record<number, boolean>>({})
@@ -57,6 +59,52 @@ export default function NotificationsModal({ open, onClose, onRefresh, onNotific
     if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
     if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
     return date.toLocaleDateString()
+  }
+
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark notification as read if it's unread
+    if (!notification.is_read) {
+      try {
+        await markNotificationAsRead(notification.notification_id)
+        
+        // Update the local state to mark as read
+        setNotifications(prev => 
+          prev?.map(n => 
+            n.notification_id === notification.notification_id 
+              ? { ...n, is_read: true }
+              : n
+          ) ?? []
+        )
+        
+        // Notify parent component that a notification was read
+        if (onNotificationRead) {
+          onNotificationRead()
+        }
+      } catch (e) {
+        console.error('Failed to mark notification as read', e)
+        // Continue with the redirect even if marking as read fails
+      }
+    }
+
+    const message = notification.message.toLowerCase()
+    
+    // Check if message contains 'friend' and redirect to friends modal (received tab)
+    if (message.includes('friend')) {
+      if (onOpenFriendsModal) {
+        onOpenFriendsModal()
+        onClose() // Close notifications modal
+      }
+      return
+    }
+    
+    // Check if message contains 'invitation' or 'invited' and redirect to invitations modal
+    if (message.includes('invitation') || message.includes('invited')) {
+      if (onOpenInvitationsModal) {
+        onOpenInvitationsModal()
+        onClose() // Close notifications modal
+      }
+      return
+    }
   }
 
   const handleMarkAsRead = async (notificationId: number) => {
@@ -109,15 +157,16 @@ export default function NotificationsModal({ open, onClose, onRefresh, onNotific
               </div>
             ) : (
               <div className="space-y-3">
-                {notifications.map((notification) => (
-                  <div 
-                    key={notification.notification_id} 
-                    className={`rounded-md border p-4 relative ${
-                      notification.is_read 
-                        ? 'border-[#633D00]/20 bg-[#FFF8EB]/50' 
-                        : 'border-[#633D00]/30 bg-white'
-                    }`}
-                  >
+                                 {notifications.map((notification) => (
+                   <div 
+                     key={notification.notification_id} 
+                     className={`rounded-md border p-4 relative cursor-pointer hover:shadow-md transition-shadow ${
+                       notification.is_read 
+                         ? 'border-[#633D00]/20 bg-[#FFF8EB]/50' 
+                         : 'border-[#633D00]/30 bg-white'
+                     }`}
+                     onClick={() => handleNotificationClick(notification)}
+                   >
                     {/* Time ago indicator in top right */}
                     <div className="absolute top-2 right-2 text-xs text-[#633D00]/60">
                       {formatTimeAgo(notification.created_at)}

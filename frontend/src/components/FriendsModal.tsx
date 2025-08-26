@@ -20,13 +20,14 @@ interface Props {
   open: boolean
   onClose: () => void
   onRefresh?: () => void
+  activeTab?: 'friends' | 'send' | 'received'
 }
 
 type TabType = 'friends' | 'send' | 'received'
 
-export default function FriendsModal({ open, onClose, onRefresh }: Props) {
+export default function FriendsModal({ open, onClose, onRefresh, activeTab: initialActiveTab }: Props) {
   const { show } = useToast()
-  const [activeTab, setActiveTab] = useState<TabType>('friends')
+  const [activeTab, setActiveTab] = useState<TabType>(initialActiveTab || 'friends')
   
   // Friends tab state
   const [friends, setFriends] = useState<FriendsListResponseItem[] | null>(null)
@@ -44,11 +45,18 @@ export default function FriendsModal({ open, onClose, onRefresh }: Props) {
   const [receivedRequests, setReceivedRequests] = useState<ReceivedFriendRequest[] | null>(null)
   const [respondLoading, setRespondLoading] = useState<Record<number, boolean>>({})
 
-  useEffect(() => {
+    useEffect(() => {
     if (!open) return
-    
+
     loadTabData()
   }, [open, activeTab])
+
+  // Update activeTab when prop changes
+  useEffect(() => {
+    if (initialActiveTab && initialActiveTab !== activeTab) {
+      setActiveTab(initialActiveTab)
+    }
+  }, [initialActiveTab, activeTab])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
