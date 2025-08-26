@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import InvitationsModal from './InvitationsModal'
 import FriendsModal from './FriendsModal'
+import NotificationsModal from './NotificationsModal'
+import { getNotifications } from '../lib/notifications'
 
 interface Props {
   onRefresh?: () => void
@@ -11,6 +13,40 @@ export default function NavBar({ onRefresh }: Props) {
   const navigate = useNavigate()
   const [invitationsModalOpen, setInvitationsModalOpen] = useState(false)
   const [friendsModalOpen, setFriendsModalOpen] = useState(false)
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false)
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false)
+
+  // Check for unread notifications on page load and refresh
+  useEffect(() => {
+    const checkUnreadNotifications = async () => {
+      try {
+        const notifications = await getNotifications()
+        const hasUnread = notifications.some(notification => !notification.is_read)
+        setHasUnreadNotifications(hasUnread)
+      } catch (error) {
+        console.error('Failed to check unread notifications:', error)
+      }
+    }
+
+    checkUnreadNotifications()
+  }, [])
+
+  // Check for unread notifications when notifications modal is closed
+  useEffect(() => {
+    if (!notificationsModalOpen) {
+      const checkUnreadNotifications = async () => {
+        try {
+          const notifications = await getNotifications()
+          const hasUnread = notifications.some(notification => !notification.is_read)
+          setHasUnreadNotifications(hasUnread)
+        } catch (error) {
+          console.error('Failed to check unread notifications:', error)
+        }
+      }
+
+      checkUnreadNotifications()
+    }
+  }, [notificationsModalOpen])
 
   return (
     <>
@@ -35,8 +71,11 @@ export default function NavBar({ onRefresh }: Props) {
               <button type="button" aria-label="Friends" className="opacity-90 hover:opacity-150" onClick={() => setFriendsModalOpen(true)}>
                 <img src="/icons/friends_icon.svg" alt="Friends" className="h-6 w-6 lg:h-7 lg:w-7 shrink-0" />
               </button>
-              <button type="button" aria-label="Notifications" className="opacity-90 hover:opacity-150">
+              <button type="button" aria-label="Notifications" className="opacity-90 hover:opacity-150 relative" onClick={() => setNotificationsModalOpen(true)}>
                 <img src="/icons/notifications_icon.svg" alt="Notifications" className="h-5 w-5 lg:h-6 lg:w-6 shrink-0" />
+                {hasUnreadNotifications && (
+                  <div className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-[#633D00]"></div>
+                )}
               </button>
               <button
                 type="button"
@@ -66,6 +105,24 @@ export default function NavBar({ onRefresh }: Props) {
         open={friendsModalOpen} 
         onClose={() => setFriendsModalOpen(false)}
         onRefresh={onRefresh}
+      />
+      <NotificationsModal 
+        open={notificationsModalOpen} 
+        onClose={() => setNotificationsModalOpen(false)}
+        onRefresh={onRefresh}
+        onNotificationRead={() => {
+          // Check for unread notifications when one is marked as read
+          const checkUnreadNotifications = async () => {
+            try {
+              const notifications = await getNotifications()
+              const hasUnread = notifications.some(notification => !notification.is_read)
+              setHasUnreadNotifications(hasUnread)
+            } catch (error) {
+              console.error('Failed to check unread notifications:', error)
+            }
+          }
+          checkUnreadNotifications()
+        }}
       />
     </>
   )

@@ -128,3 +128,12 @@ export interface ReceivedFriendRequest {
 export interface SendFriendRequestRequest {
   receiver_email: string;
 }
+
+// Notifications
+export interface Notification {
+  notification_id: number;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  type?: string;
+}
