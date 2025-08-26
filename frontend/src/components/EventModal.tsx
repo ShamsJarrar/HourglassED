@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventResponse, InvitationStatus } from '../types/api'
-import { getEventClasses, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent, withdrawFromEvent } from '../lib/events'
+import { getEventClasses, getEventClassById, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent, withdrawFromEvent } from '../lib/events'
 import type { EventUpdate } from '../types/api'
 import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation, cancelInvitation } from '../lib/invitations'
 import { getFriendById, getFriendsList, type FriendsListResponseItem } from '../lib/friends'
@@ -58,8 +58,32 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
 
   useEffect(() => {
     if (!open) return
-    getEventClasses().then(setClasses).catch(() => setClasses([]))
-  }, [open])
+    
+    async function loadClasses() {
+      try {
+        const eventClasses = await getEventClasses()
+        setClasses(eventClasses)
+        
+        // For non-owners, check if the event's class is in the loaded classes
+        if (!isOwner && event) {
+          const hasEventClass = eventClasses.some(c => c.class_id === event.event_type)
+          if (!hasEventClass) {
+            try {
+              const specificClass = await getEventClassById(event.event_type)
+              setClasses(prev => [...prev, specificClass])
+            } catch (error) {
+              console.error('Failed to load specific event class:', error)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load event classes:', error)
+        setClasses([])
+      }
+    }
+    
+    loadClasses()
+  }, [open, isOwner, event])
 
   useEffect(() => {
     if (!event) return

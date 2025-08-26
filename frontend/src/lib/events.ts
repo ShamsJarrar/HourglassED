@@ -21,7 +21,12 @@ export interface EventClassResponse {
 }
 
 export async function getEventClasses(): Promise<EventClassResponse[]> {
-  const res = await api.get<EventClassResponse[]>("/event/classes");
+  const res = await api.get<EventClassResponse[]>("/classes/");
+  return res.data;
+}
+
+export async function getEventClassById(classId: number): Promise<EventClassResponse> {
+  const res = await api.get<EventClassResponse>(`/classes/${classId}`);
   return res.data;
 }
 

@@ -2,7 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import InvitationsModal from './InvitationsModal'
 
-export default function NavBar() {
+interface Props {
+  onRefresh?: () => void
+}
+
+export default function NavBar({ onRefresh }: Props) {
   const navigate = useNavigate()
   const [invitationsModalOpen, setInvitationsModalOpen] = useState(false)
 
@@ -53,7 +57,8 @@ export default function NavBar() {
 
       <InvitationsModal 
         open={invitationsModalOpen} 
-        onClose={() => setInvitationsModalOpen(false)} 
+        onClose={() => setInvitationsModalOpen(false)}
+        onRefresh={onRefresh}
       />
     </>
   )

@@ -144,7 +144,13 @@ export default function Calendar() {
 
   return (
     <div className="min-h-screen bg-[#FAF0DC]">
-      <NavBar />
+      <NavBar onRefresh={() => {
+        const api = calendarRef.current?.getApi()
+        if (api) {
+          const view = api.view
+          handleDatesSet({ start: view.activeStart, end: view.activeEnd })
+        }
+      }} />
       <main className="mx-auto w-full px-6 py-6">
         <div className="flex items-stretch gap-6">
           {/* Left panel (smaller section) */}

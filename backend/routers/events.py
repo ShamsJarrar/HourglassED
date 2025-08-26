@@ -5,10 +5,7 @@ from utils.helpers import get_event_class
 from models.user import User
 from models.event import Event
 from models.event_invitation import EventInvitation, EventInvitationStatus
-from models.event_class import EventClass
-from models.friend import Friend
 from schemas.event import EventCreate, EventResponse, EventUpdate
-from schemas.event_class import EventClassResponse
 from typing import List, Optional
 from datetime import datetime
 from logger import logger
@@ -100,17 +97,6 @@ def get_user_events(
     if owned_only:
         return user_events
     return user_events + shared_events
-
-
-
-@router.get('/classes', response_model=List[EventClassResponse])
-def list_event_classes(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-    builtin = db.query(EventClass).filter(EventClass.is_builtin == True).all()
-    custom = db.query(EventClass).filter(EventClass.created_by == user.user_id).all()
-    return builtin + custom
 
 
 
