@@ -1,6 +1,8 @@
 import api from "./api";
 import type { EventInvitationWithEvent, InvitationStatus } from "../types/api";
 
+export type { EventInvitationWithEvent };
+
 export interface GetSentInvitationsParams {
   event_id?: number;
   status?: InvitationStatus;
@@ -12,6 +14,21 @@ export async function getSentInvitations(
   const res = await api.get<EventInvitationWithEvent[]>("/invitations/sent", {
     params,
   });
+  return res.data;
+}
+
+export async function getReceivedInvitations(): Promise<EventInvitationWithEvent[]> {
+  const res = await api.get<EventInvitationWithEvent[]>("/invitations/received");
+  return res.data;
+}
+
+export interface RespondToInvitationBody {
+  invitation_id: number;
+  response: "accepted" | "rejected";
+}
+
+export async function respondToInvitation(body: RespondToInvitationBody): Promise<EventInvitationWithEvent> {
+  const res = await api.post<EventInvitationWithEvent>("/invitations/respond", body);
   return res.data;
 }
 
