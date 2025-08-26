@@ -10,5 +10,3 @@ class Notification(Base):
     message = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_read = Column(Boolean, default=False)
-
-    user = relationship("User", back_populates="notifications", passive_deletes=True)

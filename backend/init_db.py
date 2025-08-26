@@ -5,6 +5,7 @@ from models.event_class import EventClass
 from models.event_invitation import EventInvitation
 from models.friend import Friend
 from models.friend_request import FriendRequest
+from models.notification import Notification
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
