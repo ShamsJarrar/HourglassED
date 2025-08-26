@@ -95,3 +95,36 @@ export interface FriendListItem {
   friend_name: string;
   friend_email: string;
 }
+
+export interface FriendsListResponseItem {
+  friend_id: number;
+  friend_name: string;
+  friend_email: string;
+}
+
+// Friend Requests
+export interface FriendRequest {
+  request_id: number;
+  sender_email: string;
+  receiver_email: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+export interface SentFriendRequest {
+  request_id: number;
+  receiver_email: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+export interface ReceivedFriendRequest {
+  request_id: number;
+  sender_email: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+export interface SendFriendRequestRequest {
+  receiver_email: string;
+}

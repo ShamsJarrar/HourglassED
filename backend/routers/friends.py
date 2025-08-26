@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from dependencies import get_db, get_current_user
 from utils.helpers import normalize_string
 from utils.notifications import create_notification
-from schemas.friend_request import FriendRequestCreate, FriendRequestResponse
+from schemas.friend_request import FriendRequestCreate, FriendRequestResponse, FriendRequestResponseWithEmails
 from schemas.friend import FriendResponse
 from models.friend_request import FriendRequest, FriendRequestStatus
 from models.user import User
@@ -158,32 +158,66 @@ def reject_request(
     return {"message":"Friend request rejected"}
 
 
-@router.get('/friend-requests/received', response_model=list[FriendRequestResponse])
+@router.get('/friend-requests/received', response_model=list[FriendRequestResponseWithEmails])
 def received_requests(
     db: Session = Depends(get_db),
     cur_user: User = Depends(get_current_user)
 ):
 
-    friend_requests = db.query(FriendRequest).filter(
+    friend_requests = db.query(FriendRequest).options(
+        joinedload(FriendRequest.sender),
+        joinedload(FriendRequest.receiver)
+    ).filter(
         FriendRequest.receiver_id == cur_user.user_id,
         FriendRequest.status == FriendRequestStatus.pending
     ).all()
+
+    response = [
+        FriendRequestResponseWithEmails(
+            request_id=fr.request_id,
+            sender_id=fr.sender_id,
+            receiver_id=fr.receiver_id,
+            status=fr.status,
+            created_at=fr.created_at,
+            sender_email=fr.sender.email,
+            receiver_email=fr.receiver.email
+        )
+        for fr in friend_requests
+    ]
+
     logger.debug(f"User {cur_user.user_id} fetched received friend requests")
-    return friend_requests
+    return response
 
 
-@router.get('/friend-requests/sent', response_model=list[FriendRequestResponse])
+@router.get('/friend-requests/sent', response_model=list[FriendRequestResponseWithEmails])
 def sent_requests(
     db: Session = Depends(get_db),
     cur_user: User = Depends(get_current_user)
 ):
     
-    friend_requests = db.query(FriendRequest).filter(
+    friend_requests = db.query(FriendRequest).options(
+        joinedload(FriendRequest.sender),
+        joinedload(FriendRequest.receiver)
+    ).filter(
         FriendRequest.sender_id == cur_user.user_id,
         FriendRequest.status == FriendRequestStatus.pending
     ).all()
+
+    response = [
+        FriendRequestResponseWithEmails(
+            request_id=fr.request_id,
+            sender_id=fr.sender_id,
+            receiver_id=fr.receiver_id,
+            status=fr.status,
+            created_at=fr.created_at,
+            sender_email=fr.sender.email,
+            receiver_email=fr.receiver.email
+        )
+        for fr in friend_requests
+    ]
+
     logger.debug(f"User {cur_user.user_id} fetched sent friend requests")
-    return friend_requests
+    return response
 
 
 @router.get('/friends', response_model=list[FriendResponse])
@@ -192,26 +226,20 @@ def view_friends(
     cur_user: User = Depends(get_current_user)
 ):
     
-    friends = db.query(Friend).filter(
-        Friend.user_id == cur_user.user_id,
+    friends = db.query(Friend).options(
+        joinedload(Friend.friend_user)
+    ).filter(
+        Friend.user_id == cur_user.user_id
     ).all()
 
-    friend_ids = [friend.friend_id for friend in friends]
-
-    friend_users = db.query(User).filter(User.user_id.in_(friend_ids)).all()
-
-    # Build a mapping from user_id -> user for quick lookup
-    user_by_id = {u.user_id: u for u in friend_users}
-
-    friend_responses = []
-    for fr in friends:
-        user = user_by_id.get(fr.friend_id)
-        if user:
-            friend_responses.append(FriendResponse(
-                friend_id=fr.friend_id,
-                friend_name=user.name,
-                friend_email=user.email
-            ))
+    friend_responses = [
+        FriendResponse(
+            friend_id=fr.friend_id,
+            friend_name=fr.friend_user.name,
+            friend_email=fr.friend_user.email
+        )
+        for fr in friends
+    ]
 
     logger.debug(f"User {cur_user.user_id} fetched friend list")
     return friend_responses
@@ -224,28 +252,22 @@ def view_friend(
     db: Session = Depends(get_db),
     cur_user: User = Depends(get_current_user)
 ):
-    # Ensure the requested user exists
-    friend_user = db.query(User).filter(
-        User.user_id == friend_id
-    ).first()
 
-    if not friend_user:
-        logger.warning(f"User {cur_user.user_id} requested non-existent friend user {friend_id}")
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Ensure the requested user is actually a friend of the current user
-    friendship = db.query(Friend).filter(
+    friendship = db.query(Friend).options(
+        joinedload(Friend.friend_user)
+    ).filter(
         Friend.user_id == cur_user.user_id,
         Friend.friend_id == friend_id
     ).first()
 
     if not friendship:
-        logger.warning(f"User {cur_user.user_id} is not authorized to view non-friend user {friend_id}")
-        raise HTTPException(status_code=403, detail="You are not authorized to view this user")
+        logger.warning(f"User {cur_user.user_id} requested non-existent friendship {friend_id}")
+        raise HTTPException(status_code=404, detail="Friendship not found")
 
     friend_response = FriendResponse(
-        friend_name=friend_user.name,
-        friend_email=friend_user.email
+        friend_id=friendship.friend_id,
+        friend_name=friendship.friend_user.name,
+        friend_email=friendship.friend_user.email
     )
 
     logger.debug(f"User {cur_user.user_id} fetched friend user {friend_id}")

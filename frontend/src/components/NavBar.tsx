@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import InvitationsModal from './InvitationsModal'
+import FriendsModal from './FriendsModal'
 
 interface Props {
   onRefresh?: () => void
@@ -9,6 +10,7 @@ interface Props {
 export default function NavBar({ onRefresh }: Props) {
   const navigate = useNavigate()
   const [invitationsModalOpen, setInvitationsModalOpen] = useState(false)
+  const [friendsModalOpen, setFriendsModalOpen] = useState(false)
 
   return (
     <>
@@ -30,7 +32,7 @@ export default function NavBar({ onRefresh }: Props) {
               <button type="button" aria-label="Invitations" className="opacity-90 hover:opacity-150" onClick={() => setInvitationsModalOpen(true)}>
                 <img src="/icons/invitations_icon.svg" alt="Invitations" className="h-5 w-5 lg:h-6 lg:w-6 shrink-0" />
               </button>
-              <button type="button" aria-label="Friends" className="opacity-90 hover:opacity-150">
+              <button type="button" aria-label="Friends" className="opacity-90 hover:opacity-150" onClick={() => setFriendsModalOpen(true)}>
                 <img src="/icons/friends_icon.svg" alt="Friends" className="h-6 w-6 lg:h-7 lg:w-7 shrink-0" />
               </button>
               <button type="button" aria-label="Notifications" className="opacity-90 hover:opacity-150">
@@ -58,6 +60,11 @@ export default function NavBar({ onRefresh }: Props) {
       <InvitationsModal 
         open={invitationsModalOpen} 
         onClose={() => setInvitationsModalOpen(false)}
+        onRefresh={onRefresh}
+      />
+      <FriendsModal 
+        open={friendsModalOpen} 
+        onClose={() => setFriendsModalOpen(false)}
         onRefresh={onRefresh}
       />
     </>

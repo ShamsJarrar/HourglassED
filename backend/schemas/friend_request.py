@@ -17,3 +17,11 @@ class FriendRequestResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class FriendRequestResponseWithEmails(FriendRequestResponse):
+    sender_email: EmailStr
+    receiver_email: EmailStr
+
+    class Config:
+        from_attributes = True
+
