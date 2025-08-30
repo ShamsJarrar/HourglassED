@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventResponse, InvitationStatus } from '../types/api'
-import { getEventClasses, getEventClassById, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent, withdrawFromEvent } from '../lib/events'
+import type { FriendsListResponseItem } from '../types/api'
+import { getEventClasses, getEventClassById, updateEvent, deleteEventById, type EventClassResponse, removeUserFromEvent, withdrawFromEvent, updateSeries, deleteSeries, getEvents, getSeries } from '../lib/events'
 import type { EventUpdate } from '../types/api'
 import { getSentInvitations, getParticipants, type ParticipantResponse, createInvitation, cancelInvitation } from '../lib/invitations'
-import { getFriendById, getFriendsList, type FriendsListResponseItem } from '../lib/friends'
+import { getFriendById, getFriendsList } from '../lib/friends'
 import { useToast } from './Toast'
 
 type InvitationRow = {
@@ -41,6 +42,15 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
   const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null)
   const [actionLoadingFor, setActionLoadingFor] = useState<number | null>(null)
+  const [seriesActionLoading, setSeriesActionLoading] = useState<boolean>(false)
+  const [applyAll, setApplyAll] = useState<boolean>(false)
+  // Recurrence edit state (for series rule editing)
+  const [rFreq, setRFreq] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'>('WEEKLY')
+  const [rInterval, setRInterval] = useState<number>(1)
+  const [rByWeekday, setRByWeekday] = useState<string[]>([])
+  const [rByMonthDay, setRByMonthDay] = useState<number | ''>('')
+  const [rEndMode, setREndMode] = useState<'never' | 'on'>('never')
+  const [rEndOnDate, setREndOnDate] = useState<string>('')
   const availableFriends = useMemo(() => {
     if (!friends) return [] as FriendsListResponseItem[]
     const blockedIds = new Set<number>()
@@ -106,10 +116,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
     setUseCustomType(false)
     setCustomTypeName('')
     // initialize editable start/end values
-    const ensureUtcIso = (value: string) => {
-      // If backend sends naive ISO (no timezone), treat it as UTC
-      return /([zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`
-    }
+    const ensureUtcIso = (value: string) => (/([zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`)
     const toLocalInput = (iso: string) => {
       const d = new Date(ensureUtcIso(iso))
       const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
@@ -117,8 +124,65 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
     }
     setStartLocal(toLocalInput(event.start_time))
     setEndLocal(toLocalInput(event.end_time))
-    
+    // Load series rule if present to prefill recurrence editor
+    ;(async () => {
+      try {
+        if (event.series_id && isOwner) {
+          const s = await getSeries(event.series_id)
+          // Parse recurrence_pattern minimally: FREQ, INTERVAL, BYDAY, BYMONTHDAY
+          const rule = s.recurrence_pattern || ''
+          const parts = Object.fromEntries(rule.split(';').filter(Boolean).map(kv => {
+            const [k, v] = kv.split('=')
+            return [k?.toUpperCase() || '', v || '']
+          })) as Record<string, string>
+          const f = (parts['FREQ'] as any) || 'WEEKLY'
+          setRFreq((f === 'DAILY' || f === 'WEEKLY' || f === 'MONTHLY' || f === 'YEARLY') ? f : 'WEEKLY')
+          const iv = Number(parts['INTERVAL'] || '1')
+          setRInterval(Number.isFinite(iv) && iv > 0 ? iv : 1)
+          if (parts['BYDAY']) setRByWeekday(parts['BYDAY'].split(',').filter(Boolean))
+          else setRByWeekday([])
+          if (parts['BYMONTHDAY']) {
+            const md = Number(parts['BYMONTHDAY'])
+            setRByMonthDay(Number.isFinite(md) ? md : '')
+          } else setRByMonthDay('')
+          if (s.recurrence_end) {
+            setREndMode('on')
+            const ensureUtcIso = (value: string) => (/([zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`)
+            const d = new Date(ensureUtcIso(s.recurrence_end as unknown as string))
+            const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+            setREndOnDate(local.toISOString().slice(0,16))
+          } else {
+            setREndMode('never')
+            setREndOnDate('')
+          }
+        } else {
+          // defaults
+          setRFreq('WEEKLY')
+          setRInterval(1)
+          setRByWeekday([])
+          setRByMonthDay('')
+          setREndMode('never')
+          setREndOnDate('')
+        }
+      } catch (e) {
+        // fall back to defaults silently
+      }
+    })()
+
   }, [event, classNameById])
+
+  const toggleRuleWeekday = (wd: string) => {
+    setRByWeekday((prev) => prev.includes(wd) ? prev.filter((x) => x !== wd) : [...prev, wd])
+  }
+
+  const buildRule = (): string => {
+    const parts: string[] = []
+    parts.push(`FREQ=${rFreq}`)
+    if (rInterval && rInterval > 1) parts.push(`INTERVAL=${rInterval}`)
+    if (rFreq === 'WEEKLY' && rByWeekday.length) parts.push(`BYDAY=${rByWeekday.join(',')}`)
+    if (rFreq === 'MONTHLY' && rByMonthDay && typeof rByMonthDay === 'number') parts.push(`BYMONTHDAY=${rByMonthDay}`)
+    return parts.join(';')
+  }
 
   // helper to load invitations and map to rows
   async function fetchAndSetInvitations(currentEvent: EventResponse) {
@@ -363,7 +427,133 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
 
           <div>
             <label className="block text-sm mb-1">Recurrence</label>
-            <input disabled value="Not implemented yet" className="w-full rounded-md border border-[#633D00]/40 bg-[#f5efe2] px-3 py-2 text-[#633D00]/70" />
+            {event.series_id ? (
+              <div className="rounded-md border border-[#633D00]/30 bg-white px-3 py-3 text-sm space-y-3">
+                {isOwner && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm mb-1">Frequency</label>
+                        <select className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" value={rFreq} onChange={(e) => setRFreq(e.target.value as any)}>
+                          <option value="DAILY">Daily</option>
+                          <option value="WEEKLY">Weekly</option>
+                          <option value="MONTHLY">Monthly</option>
+                          <option value="YEARLY">Yearly</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Interval</label>
+                        <input type="number" min={1} value={rInterval} onChange={(e) => setRInterval(Math.max(1, Number(e.target.value) || 1))} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+                      </div>
+                    </div>
+
+                    {rFreq === 'WEEKLY' && (
+                      <div>
+                        <label className="block text-sm mb-1">Repeat on</label>
+                        <div className="grid grid-cols-7 gap-1 text-xs">
+                          {['MO','TU','WE','TH','FR','SA','SU'].map((wd) => (
+                            <button key={wd} type="button" onClick={() => toggleRuleWeekday(wd)} className={`px-2 py-1 border rounded ${rByWeekday.includes(wd) ? 'bg-[#633D00] text-[#FAF0DC] border-[#633D00]' : 'bg-white text-[#633D00] border-[#633D00]/50'}`}>{wd}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {rFreq === 'MONTHLY' && (
+                      <div>
+                        <label className="block text-sm mb-1">On day of month</label>
+                        <input type="number" min={1} max={31} value={rByMonthDay === '' ? '' : rByMonthDay} onChange={(e) => {
+                          const v = e.target.value
+                          if (v === '') setRByMonthDay('')
+                          else setRByMonthDay(Math.min(31, Math.max(1, Number(v))))
+                        }} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm mb-1">Ends</label>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <label className="inline-flex items-center gap-2"><input type="radio" name="rendmode" checked={rEndMode==='never'} onChange={() => setREndMode('never')} />Never</label>
+                        <label className="inline-flex items-center gap-2"><input type="radio" name="rendmode" checked={rEndMode==='on'} onChange={() => setREndMode('on')} />On date & time</label>
+                      </div>
+                      {rEndMode === 'on' && (
+                        <input type="datetime-local" value={rEndOnDate} onChange={(e) => setREndOnDate(e.target.value)} className="mt-2 w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={seriesActionLoading}
+                        onClick={async () => {
+                          if (!event) return
+                          try {
+                            setSeriesActionLoading(true)
+                            const rule = buildRule()
+                            const pivot = event.start_time
+                            const newEnd = rEndMode === 'on' && rEndOnDate ? new Date(rEndOnDate).toISOString() : undefined
+                            await updateSeries(event.series_id!, { recurrence_pattern: rule, recurrence_end: newEnd }, { pivot, months: 6 })
+                            onClose()
+                          } catch (e) {
+                            console.error('Failed to update series rule', e)
+                          } finally {
+                            setSeriesActionLoading(false)
+                          }
+                        }}
+                        className="rounded-md border border-[#633D00] px-2 py-1 hover:bg-[#633D00]/10"
+                      >
+                        Edit series recurrence starting from this event
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={seriesActionLoading}
+                        onClick={async () => {
+                          if (!event) return
+                          try {
+                            setSeriesActionLoading(true)
+                            const pivot = event.start_time
+                            await updateSeries(event.series_id!, {}, { pivot, months: 6 })
+                            onClose()
+                          } catch (e) {
+                            console.error('Failed to regenerate series', e)
+                          } finally {
+                            setSeriesActionLoading(false)
+                          }
+                        }}
+                        className="rounded-md border border-[#633D00] px-2 py-1 hover:bg-[#633D00]/10"
+                      >
+                        Regenerate from here
+                      </button>
+                      <img src="/icons/info_icon.svg" alt="info" title="If future events are not showing, press to extend the viewing window (dev feature)" className="h-4 w-4 opacity-80" />
+                    </div>
+
+                    <div>
+                      <button
+                        disabled={seriesActionLoading}
+                        onClick={async () => {
+                          if (!event) return
+                          if (!confirm('Delete the entire series? This will remove all events in the series.')) return
+                          try {
+                            setSeriesActionLoading(true)
+                            await deleteSeries(event.series_id!)
+                            onClose()
+                          } catch (e) {
+                            console.error('Failed to delete series', e)
+                          } finally {
+                            setSeriesActionLoading(false)
+                          }
+                        }}
+                        className="rounded-md border border-red-700 text-red-700 px-2 py-1 hover:bg-red-50"
+                      >
+                        Delete series
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <input disabled value="Not recurring" className="w-full rounded-md border border-[#633D00]/40 bg-[#f5efe2] px-3 py-2 text-[#633D00]/70" />
+            )}
           </div>
 
           <div>
@@ -373,6 +563,9 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
           {isOwner && (
             <div className="pt-3 border-t border-[#633D00]/30">
               <label className="block text-sm font-medium mb-2">Invitations</label>
+              {event.series_id && (
+                <div className="text-xs text-[#633D00]/70 mb-2">Invitations are for this event only (not future instances).</div>
+              )}
               {invitations === null ? (
                 <div className="text-sm text-[#633D00]/70">Loading invitations…</div>
               ) : invitations.length === 0 ? (
@@ -525,7 +718,7 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
 
         
 
-        <div className="mt-8 flex justify-between gap-3">
+        <div className="mt-8 flex items-center gap-3">
           {isOwner && (
             <button
               onClick={async () => {
@@ -560,33 +753,77 @@ export default function EventModal({ event, isOwner, open, onClose }: Props) {
               Withdraw
             </button>
           )}
-          {isOwner && (
-            <button
-              onClick={async () => {
-                if (!event) return
-                const typeName = (useCustomType ? customTypeName : selectedClassName).trim()
-                const body: EventUpdate = {
-                  event_type: typeName || undefined,
-                  header: header ?? undefined,
-                  title: title,
-                  start_time: startLocal ? new Date(startLocal).toISOString() : undefined,
-                  end_time: endLocal ? new Date(endLocal).toISOString() : undefined,
-                  color: color ?? undefined,
-                  notes: notes ?? undefined,
-                }
-                try {
-                  await updateEvent(event.event_id, body)
-                  onClose()
-                  // optional: expose onSaved to trigger refetch from parent
-                } catch (e) {
-                  console.error('Failed to update event', e)
-                }
-              }}
-              className="rounded-md bg-[#633D00] text-[#FAF0DC] px-4 py-2 hover:bg-[#765827]"
-            >
-              Save
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {isOwner && event?.series_id && (
+              <label className="inline-flex items-center gap-2 text-sm text-[#633D00]">
+                <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} />
+                Apply changes to all
+              </label>
+            )}
+            {isOwner && (
+              <button
+                onClick={async () => {
+                  if (!event) return
+                  const typeName = (useCustomType ? customTypeName : selectedClassName).trim()
+                  const body: EventUpdate = {
+                    event_type: typeName || undefined,
+                    header: header ?? undefined,
+                    title: title,
+                    start_time: startLocal ? new Date(startLocal).toISOString() : undefined,
+                    end_time: endLocal ? new Date(endLocal).toISOString() : undefined,
+                    color: color ?? undefined,
+                    notes: notes ?? undefined,
+                    timezone: 'UTC',
+                  }
+                  try {
+                    if (applyAll && event.series_id) {
+                      const all = await getEvents({ owned_only: true })
+                      const inSeries = all.filter((e) => e.series_id === event.series_id && !e.is_exception)
+
+                      const ensureUtcIso = (value: string) => (/([zZ]|[+-]\\d{2}:?\\d{2})$/.test(value) ? value : `${value}Z`)
+                      const origStart = new Date(ensureUtcIso(event.start_time))
+                      const origEnd = new Date(ensureUtcIso(event.end_time))
+                      const newStart = startLocal ? new Date(startLocal) : null
+                      const newEnd = endLocal ? new Date(endLocal) : null
+                      const timingChanged = !!(newStart && newEnd && (newStart.getTime() !== origStart.getTime() || newEnd.getTime() !== origEnd.getTime()))
+                      const newDurationMs = newStart && newEnd ? (newEnd.getTime() - newStart.getTime()) : null
+
+                      for (const ev of inSeries) {
+                        const update: EventUpdate = {
+                          event_type: body.event_type,
+                          header: body.header,
+                          title: body.title,
+                          color: body.color,
+                          notes: body.notes,
+                          timezone: 'UTC',
+                        }
+                        if (timingChanged && newStart && newDurationMs != null) {
+                          const evStart = new Date(ensureUtcIso(ev.start_time))
+                          const startUTC = new Date(Date.UTC(
+                            evStart.getUTCFullYear(), evStart.getUTCMonth(), evStart.getUTCDate(),
+                            newStart.getUTCHours(), newStart.getUTCMinutes(), 0
+                          ))
+                          const endUTC = new Date(startUTC.getTime() + newDurationMs)
+                          update.start_time = startUTC.toISOString()
+                          update.end_time = endUTC.toISOString()
+                        }
+                        try { await updateEvent(ev.event_id, update) } catch {}
+                      }
+                      onClose()
+                    } else {
+                      await updateEvent(event.event_id, body)
+                      onClose()
+                    }
+                  } catch (e) {
+                    console.error('Failed to update event', e)
+                  }
+                }}
+                className="rounded-md bg-[#633D00] text-[#FAF0DC] px-4 py-2 hover:bg-[#765827]"
+              >
+                Save
+              </button>
+            )}
+          </div>
         </div>
         </div>
       </div>

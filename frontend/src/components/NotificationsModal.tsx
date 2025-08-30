@@ -191,7 +191,7 @@ export default function NotificationsModal({ open, onClose, onRefresh, onNotific
                     {!notification.is_read && (
                       <div className="flex justify-end">
                         <button
-                          onClick={() => handleMarkAsRead(notification.notification_id)}
+                          onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notification.notification_id) }}
                           disabled={markAsReadLoading[notification.notification_id]}
                           className="px-3 py-1.5 bg-[#633D00] text-white text-sm rounded-md hover:bg-[#633D00]/90 disabled:opacity-60 disabled:cursor-not-allowed"
                         >

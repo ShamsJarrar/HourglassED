@@ -22,7 +22,7 @@ def create_event(
 ):
 
     event_class = get_event_class(event_info.event_type, db, user)
-
+    
     if event_info.start_time >= event_info.end_time:
         logger.warning(f"User {user.user_id} added invalid start and end times when creating an event")
         raise HTTPException(status_code=400, 
@@ -34,11 +34,11 @@ def create_event(
         title = event_info.title,
         start_time = event_info.start_time,
         end_time = event_info.end_time,
-        recurring_event_id = event_info.recurring_event_id,
         color = event_info.color,
         notes = event_info.notes,
-        linked_event_id = event_info.linked_event_id,
-        user_id = user.user_id
+        user_id = user.user_id,
+        series_id = event_info.series_id,
+        is_exception = False
     )
     db.add(new_event)
     db.commit()
@@ -154,15 +154,40 @@ def update_event(
         logger.warning(f"User {user.user_id} is not authorized to edit event {event.event_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to edit this event")
     
+
+    changed = False
+
+
     if updated_info.event_type is not None:
         event_class = get_event_class(updated_info.event_type, db, user)
-        event.event_type = event_class.class_id
+        if event.event_type != event_class.class_id:
+            event.event_type = event_class.class_id
+            changed = True
     
-    for field in ["header", "title", "start_time", "end_time", "color", "notes", "linked_event_id", "recurring_event_id"]:
-        value = getattr(updated_info, field)
-        if value is not None:
-            setattr(event, field, value)
 
+    if updated_info.start_time is not None:
+        if updated_info.start_time != event.start_time:
+            event.start_time = updated_info.start_time
+            changed = True
+
+    if updated_info.end_time is not None:
+        if updated_info.end_time != event.end_time:
+            event.end_time = updated_info.end_time
+            changed = True
+    
+    if event.end_time and event.start_time and event.start_time  >= event.end_time:
+        logger.warning(f"User {user.user_id} tried to update an event with invalid start and end times")
+        raise HTTPException(status_code=400, detail="start_time must be before end_time")
+
+    # timezone is fixed to UTC by default; no updates applied
+    
+    for field in ["header", "title", "color", "notes"]:
+        value = getattr(updated_info, field)
+        if value is not None and getattr(event, field) != value:
+            setattr(event, field, value)
+            changed = True
+
+    # is_exception is not used for now; keep it false
 
     db.commit()
     db.refresh(event)

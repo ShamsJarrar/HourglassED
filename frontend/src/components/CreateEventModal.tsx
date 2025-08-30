@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EventCreate } from '../types/api'
-import { getEventClasses, type EventClassResponse, createEvent } from '../lib/events'
-import { getFriendsList, type FriendsListResponseItem } from '../lib/friends'
+import type { RecurrenceSeriesCreate } from '../types/api'
+import type { FriendsListResponseItem } from '../types/api'
+import { getEventClasses, type EventClassResponse, createEvent, createSeries, getEvents } from '../lib/events'
+import { getFriendsList } from '../lib/friends'
 import { createInvitation } from '../lib/invitations'
 import { useToast } from './Toast'
 
@@ -23,6 +25,14 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
   const [endLocal, setEndLocal] = useState<string>('')
   const [color, setColor] = useState<string | undefined>('')
   const [notes, setNotes] = useState<string | undefined>('')
+  // Recurrence UI state
+  const [repeatEnabled, setRepeatEnabled] = useState<boolean>(false)
+  const [freq, setFreq] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY'>('WEEKLY')
+  const [interval, setInterval] = useState<number>(1)
+  const [byWeekday, setByWeekday] = useState<string[]>([])
+  const [byMonthDay, setByMonthDay] = useState<number | ''>('')
+  const [endMode, setEndMode] = useState<'never' | 'on' | 'after'>('never')
+  const [endOnDate, setEndOnDate] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [friends, setFriends] = useState<FriendsListResponseItem[] | null>(null)
   const [selectedFriendId, setSelectedFriendId] = useState<number | ''>('')
@@ -82,6 +92,17 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
   }, [open])
 
   const classNames = useMemo(() => classes.map((c) => c.class_name), [classes])
+  const toggleWeekday = (wd: string) => {
+    setByWeekday((prev) => prev.includes(wd) ? prev.filter((x) => x !== wd) : [...prev, wd])
+  }
+  const buildRRule = (_timezone: string): string => {
+    const parts: string[] = []
+    parts.push(`FREQ=${freq}`)
+    if (interval && interval > 1) parts.push(`INTERVAL=${interval}`)
+    if (freq === 'WEEKLY' && byWeekday.length) parts.push(`BYDAY=${byWeekday.join(',')}`)
+    if (freq === 'MONTHLY' && byMonthDay && typeof byMonthDay === 'number') parts.push(`BYMONTHDAY=${byMonthDay}`)
+    return parts.join(';')
+  }
 
   if (!open) return null
 
@@ -202,7 +223,64 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
 
             <div>
               <label className="block text-sm mb-1">Recurrence</label>
-              <input disabled value="Not implemented yet" className="w-full rounded-md border border-[#633D00]/40 bg-[#f5efe2] px-3 py-2 text-[#633D00]/70" />
+              <div className="space-y-2 rounded-md border border-[#633D00]/30 bg-white p-3">
+                <div className="flex items-center gap-2">
+                  <input id="repeat" type="checkbox" checked={repeatEnabled} onChange={(e) => setRepeatEnabled(e.target.checked)} />
+                  <label htmlFor="repeat" className="text-sm">Repeat</label>
+                </div>
+                {repeatEnabled && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm mb-1">Frequency</label>
+                        <select className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" value={freq} onChange={(e) => setFreq(e.target.value as any)}>
+                          <option value="DAILY">Daily</option>
+                          <option value="WEEKLY">Weekly</option>
+                          <option value="MONTHLY">Monthly</option>
+                          <option value="YEARLY">Yearly</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm mb-1">Interval</label>
+                        <input type="number" min={1} value={interval} onChange={(e) => setInterval(Math.max(1, Number(e.target.value) || 1))} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+                      </div>
+                    </div>
+
+                    {freq === 'WEEKLY' && (
+                      <div>
+                        <label className="block text-sm mb-1">Repeat on</label>
+                        <div className="grid grid-cols-7 gap-1 text-xs">
+                          {['MO','TU','WE','TH','FR','SA','SU'].map((wd) => (
+                            <button key={wd} type="button" onClick={() => toggleWeekday(wd)} className={`px-2 py-1 border rounded ${byWeekday.includes(wd) ? 'bg-[#633D00] text-[#FAF0DC] border-[#633D00]' : 'bg-white text-[#633D00] border-[#633D00]/50'}`}>{wd}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {freq === 'MONTHLY' && (
+                      <div>
+                        <label className="block text-sm mb-1">On day of month</label>
+                        <input type="number" min={1} max={31} value={byMonthDay === '' ? '' : byMonthDay} onChange={(e) => {
+                          const v = e.target.value
+                          if (v === '') setByMonthDay('')
+                          else setByMonthDay(Math.min(31, Math.max(1, Number(v))))
+                        }} className="w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm mb-1">Ends</label>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <label className="inline-flex items-center gap-2"><input type="radio" name="endmode" checked={endMode==='never'} onChange={() => setEndMode('never')} />Never</label>
+                        <label className="inline-flex items-center gap-2"><input type="radio" name="endmode" checked={endMode==='on'} onChange={() => setEndMode('on')} />On date & time</label>
+                      </div>
+                      {endMode === 'on' && (
+                        <input type="datetime-local" value={endOnDate} onChange={(e) => setEndOnDate(e.target.value)} className="mt-2 w-full rounded-md border border-[#633D00] px-3 py-2 bg-white" />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -212,7 +290,11 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
 
             <div className="pt-3 border-t border-[#633D00]/30">
               <label className="block text-sm font-medium mb-2">Invitations</label>
-              <div className="text-xs text-[#633D00]/70 mb-2">Invitations will be sent after the event is created.</div>
+              <div className="text-xs text-[#633D00]/70 mb-2">
+                {repeatEnabled
+                  ? 'For recurring series, invitations will be sent for the first instance only.'
+                  : 'Invitations will be sent after the event is created.'}
+              </div>
               {inviteQueue.length > 0 && (
                 <ul className="mb-2 space-y-2">
                   {inviteQueue.map((f) => (
@@ -272,7 +354,8 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
                 const startDate = new Date(startLocal)
                 const endDate = new Date(endLocal)
                 if (!(startDate < endDate)) return
-                const body: EventCreate = {
+                const timezone = 'UTC'
+                const eventPayload: EventCreate = {
                   event_type: typeName,
                   header: header ?? undefined,
                   title: title,
@@ -280,20 +363,49 @@ export default function CreateEventModal({ open, onClose, onCreated }: Props) {
                   end_time: new Date(endLocal).toISOString(),
                   color: color ?? undefined,
                   notes: notes ?? undefined,
+                  timezone,
                 }
                 try {
                   setSubmitting(true)
-                  const created = await createEvent(body)
-                  // Send invitations in sequence (could be parallel if needed)
-                  for (const f of inviteQueue) {
+                  if (repeatEnabled) {
+                    const rrule = buildRRule(timezone)
+                    const recurrence: RecurrenceSeriesCreate = {
+                      recurrence_pattern: rrule,
+                      recurrence_end: endMode === 'on' && endOnDate ? new Date(endOnDate).toISOString() : undefined,
+                    }
+                    const createdSeries = await createSeries({ recurrence, event: eventPayload })
+                    // After creating the series, invite selected friends to the first instance only
                     try {
-                      await createInvitation({ event_id: created.event_id, invited_user_id: f.friend_id })
-                    } catch (e: any) {
-                      const status = e?.response?.status
-                      if (status === 400) show('Invalid invitation request', 'warning')
-                      else if (status === 403) show('Not authorized to invite one or more users', 'error')
-                      else if (status === 404) show('Event or user not found for an invite', 'warning')
-                      else show('Failed to send one or more invitations', 'error')
+                      // Narrow the fetch window around the seed start/end to reduce payload
+                      const start = new Date(eventPayload.start_time)
+                      const end = new Date(eventPayload.end_time)
+                      const windowStart = new Date(start.getTime() - 15 * 60 * 1000).toISOString()
+                      const windowEnd = new Date(end.getTime() + 15 * 60 * 1000).toISOString()
+                      const candidates = await getEvents({ owned_only: true, start_time: windowStart, end_time: windowEnd })
+                      const inSeries = candidates.filter(e => (e.series_id === createdSeries.series_id))
+                      let first = inSeries[0]
+                      for (const ev of inSeries) {
+                        if (new Date(ev.start_time) < new Date(first.start_time)) first = ev
+                      }
+                      if (first) {
+                        for (const f of inviteQueue) {
+                          try { await createInvitation({ event_id: first.event_id, invited_user_id: f.friend_id }) } catch {}
+                        }
+                      }
+                    } catch {}
+                  } else {
+                    const created = await createEvent(eventPayload)
+                    // Send invitations in sequence (could be parallel if needed)
+                    for (const f of inviteQueue) {
+                      try {
+                        await createInvitation({ event_id: created.event_id, invited_user_id: f.friend_id })
+                      } catch (e: any) {
+                        const status = e?.response?.status
+                        if (status === 400) show('Invalid invitation request', 'warning')
+                        else if (status === 403) show('Not authorized to invite one or more users', 'error')
+                        else if (status === 404) show('Event or user not found for an invite', 'warning')
+                        else show('Failed to send one or more invitations', 'error')
+                      }
                     }
                   }
                   onClose()

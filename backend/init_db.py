@@ -6,6 +6,7 @@ from models.event_invitation import EventInvitation
 from models.friend import Friend
 from models.friend_request import FriendRequest
 from models.notification import Notification
+from models.recurrence_series import RecurrenceSeries
 
 def create_tables():
     Base.metadata.create_all(bind=engine)

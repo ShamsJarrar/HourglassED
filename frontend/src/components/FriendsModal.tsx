@@ -51,12 +51,13 @@ export default function FriendsModal({ open, onClose, onRefresh, activeTab: init
     loadTabData()
   }, [open, activeTab])
 
-  // Update activeTab when prop changes
+  // Initialize/adjust activeTab only when the prop changes (or modal opens)
   useEffect(() => {
-    if (initialActiveTab && initialActiveTab !== activeTab) {
+    if (!open) return
+    if (initialActiveTab) {
       setActiveTab(initialActiveTab)
     }
-  }, [initialActiveTab, activeTab])
+  }, [initialActiveTab, open])
 
   // Close dropdowns when clicking outside
   useEffect(() => {

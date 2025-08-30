@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -13,12 +13,14 @@ class Event(Base):
     end_time = Column(DateTime, nullable=False)
     color = Column(String(20), default="#FFD700")
     notes = Column(Text)
-    linked_event_id = Column(Integer, ForeignKey("events.event_id", ondelete="SET NULL"))
-    recurring_event_id = Column(Integer, ForeignKey("events.event_id", ondelete="CASCADE"))
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    series_id = Column(Integer, ForeignKey("recurrence_series.series_id", ondelete="CASCADE"), nullable=True)
+
+    # is_exception and timezone are not used for now and are defaulted to False and "UTC"
+    is_exception = Column(Boolean, default=False)
+    timezone = Column(String(64), default="UTC")
 
     event_class = relationship("EventClass", backref="events", passive_deletes=True)
     user = relationship("User", backref="events", foreign_keys=[user_id], passive_deletes=True)
-    linked_event = relationship("Event", remote_side=[event_id], foreign_keys=[linked_event_id], passive_deletes=True)
+    series = relationship("RecurrenceSeries", back_populates="events", foreign_keys=[series_id], passive_deletes=True)
     invitations = relationship("EventInvitation", back_populates="event", passive_deletes=True, cascade="all, delete-orphan")
-    parent_recurring_event = relationship("Event", remote_side=[event_id], foreign_keys=[recurring_event_id], backref="recurring_events", passive_deletes=True)

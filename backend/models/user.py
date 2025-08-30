@@ -15,3 +15,4 @@ class User(Base):
     otp_expiration = Column(DateTime, nullable=True)
 
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    recurrence_series = relationship("RecurrenceSeries", back_populates="user", cascade="all, delete-orphan")

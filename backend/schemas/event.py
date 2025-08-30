@@ -3,19 +3,24 @@ from datetime import datetime
 from typing import Optional
 
 
-class EventCreate(BaseModel):
-    event_type: str
+class EventBase(BaseModel):
+    event_type: str                      # event_type is inputted as a string, and then normalized to an int in the backend
     header: Optional[str] = None
     title: str
     start_time: datetime
     end_time: datetime
     color: Optional[str] = None
     notes: Optional[str] = None
-    linked_event_id: Optional[int] = None
-    recurring_event_id: Optional[int] = None  
+    series_id: Optional[int] = None
+    is_exception: Optional[bool] = False
+    timezone: str = "UTC"
 
 
-class EventResponse(EventCreate):
+class EventCreate(EventBase):
+    pass
+
+
+class EventResponse(EventBase):
     event_id: int
     user_id: int
     event_type: int
@@ -32,8 +37,9 @@ class EventUpdate(BaseModel):
     end_time: Optional[datetime] = None
     color: Optional[str] = None
     notes: Optional[str] = None
-    linked_event_id: Optional[int] = None
-    recurring_event_id: Optional[int] = None
+    series_id: Optional[int] = None
+    is_exception: Optional[bool] = None
+    timezone: Optional[str] = None
 
 
 class EventOwnerEmail(BaseModel):
@@ -43,7 +49,7 @@ class EventOwnerEmail(BaseModel):
         from_attributes = True
 
 
-class EventResponseWithOwnerEmail(EventCreate):
+class EventResponseWithOwnerEmail(EventBase):
     event_id: int
     event_type: int
     user: EventOwnerEmail

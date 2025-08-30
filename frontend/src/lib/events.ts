@@ -1,5 +1,6 @@
 import api from "./api";
 import type { EventResponse, EventUpdate, EventCreate } from "../types/api";
+import type { RecurrenceSeriesCreate, RecurrenceSeriesResponse, RecurrenceSeriesUpdate } from "../types/api";
 
 export interface GetEventsParams {
   start_time?: string;
@@ -50,4 +51,34 @@ export async function withdrawFromEvent(eventId: number): Promise<void> {
 export async function createEvent(body: EventCreate): Promise<EventResponse> {
   const res = await api.post<EventResponse>(`/event/`, body);
   return res.data;
+}
+
+// Recurrence Series API
+export interface CreateSeriesBody {
+  recurrence: RecurrenceSeriesCreate;
+  event: EventCreate;
+}
+
+export async function createSeries(body: CreateSeriesBody): Promise<RecurrenceSeriesResponse> {
+  const res = await api.post<RecurrenceSeriesResponse>(`/series/create`, body);
+  return res.data;
+}
+
+export interface UpdateSeriesParams {
+  pivot?: string; // ISO datetime; if omitted, backend uses current UTC
+  months?: number; // how many months to generate (default 6)
+}
+
+export async function updateSeries(seriesId: number, body: RecurrenceSeriesUpdate, params: UpdateSeriesParams = {}): Promise<RecurrenceSeriesResponse> {
+  const res = await api.patch<RecurrenceSeriesResponse>(`/series/${seriesId}`, body, { params });
+  return res.data;
+}
+
+export async function getSeries(seriesId: number): Promise<RecurrenceSeriesResponse> {
+  const res = await api.get<RecurrenceSeriesResponse>(`/series/${seriesId}`);
+  return res.data;
+}
+
+export async function deleteSeries(seriesId: number): Promise<void> {
+  await api.delete(`/series/${seriesId}`);
 }

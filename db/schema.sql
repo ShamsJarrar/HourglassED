@@ -21,6 +21,16 @@ CREATE TABLE IF NOT EXISTS event_classes (
 );
 
 
+CREATE TABLE IF NOT EXISTS recurrence_series (
+  series_id INT AUTO_INCREMENT PRIMARY KEY,
+  recurrence_pattern VARCHAR(255) NOT NULL,
+  recurrence_end DATETIME NULL,
+  user_id INT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+
 CREATE TABLE IF NOT EXISTS events (
   event_id INT AUTO_INCREMENT PRIMARY KEY,
   event_type INT NOT NULL,
@@ -28,16 +38,17 @@ CREATE TABLE IF NOT EXISTS events (
   title VARCHAR(255) NOT NULL,
   start_time DATETIME NOT NULL,
   end_time DATETIME NOT NULL,
-  color VARCHAR(20) DEFAULT '#4A90E2',
+  color VARCHAR(20) DEFAULT '#FFD700',
   notes TEXT,
-  linked_event_id INT,
-  recurring_event_id INT, -- NEW: series ID for expanded events
   user_id INT NOT NULL,
+  series_id INT DEFAULT NULL,
+  is_exception BOOLEAN NOT NULL DEFAULT FALSE,
+  timezone VARCHAR(64) DEFAULT 'UTC', 
   FOREIGN KEY (event_type) REFERENCES event_classes(class_id) ON DELETE RESTRICT,
-  FOREIGN KEY (linked_event_id) REFERENCES events(event_id) ON DELETE SET NULL,
-  FOREIGN KEY (recurring_event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+  FOREIGN KEY (series_id) REFERENCES recurrence_series(series_id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+
 
 
 CREATE TABLE IF NOT EXISTS friend_requests (

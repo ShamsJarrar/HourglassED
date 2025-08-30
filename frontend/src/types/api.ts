@@ -21,8 +21,9 @@ export interface EventCreate {
   end_time: string;   // ISO datetime string
   color?: string | null;
   notes?: string | null;
-  linked_event_id?: number | null;
-  recurring_event_id?: number | null;
+  timezone: string;
+  series_id?: number | null;
+  is_exception?: boolean;
 }
 
 // Note: EventResponse from backend returns numeric class id
@@ -36,8 +37,9 @@ export interface EventResponse {
   end_time: string;
   color?: string | null;
   notes?: string | null;
-  linked_event_id?: number | null;
-  recurring_event_id?: number | null;
+  series_id?: number | null;
+  is_exception: boolean;
+  timezone: string;
 }
 
 export interface EventUpdate {
@@ -48,8 +50,9 @@ export interface EventUpdate {
   end_time?: string;
   color?: string | null;
   notes?: string | null;
-  linked_event_id?: number | null;
-  recurring_event_id?: number | null;
+  series_id?: number | null;
+  is_exception?: boolean;
+  timezone?: string;
 }
 
 // Invitations
@@ -78,8 +81,9 @@ export interface EventInvitationWithEvent {
     end_time: string;
     color?: string | null;
     notes?: string | null;
-    linked_event_id?: number | null;
-    recurring_event_id?: number | null;
+    series_id?: number | null;
+    is_exception: boolean;
+    timezone: string;
   };
 }
 
@@ -136,4 +140,23 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
   type?: string;
+}
+
+// Recurrence Series
+export interface RecurrenceSeriesCreate {
+  recurrence_pattern: string;
+  recurrence_end?: string | null; // ISO datetime string or null
+}
+
+export interface RecurrenceSeriesResponse {
+  series_id: number;
+  user_id: number;
+  recurrence_pattern: string;
+  recurrence_end?: string | null;
+  created_at: string;
+}
+
+export interface RecurrenceSeriesUpdate {
+  recurrence_pattern?: string;
+  recurrence_end?: string | null;
 }

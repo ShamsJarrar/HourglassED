@@ -81,6 +81,9 @@ export default function Calendar() {
         ...(filters.owned_only ? { owned_only: true } : {}),
         ...(filters.event_types && filters.event_types.length ? { event_types: filters.event_types } : {}),
       })
+      const ensureUtcIso = (value: string) => {
+        return /([zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`
+      }
       const mapped = data.map((e) => {
         const normalizeHex = (val?: string) => {
           if (!val) return undefined
@@ -102,8 +105,8 @@ export default function Calendar() {
         return {
         id: String(e.event_id),
         title: e.title,
-        start: e.start_time,
-        end: e.end_time,
+        start: ensureUtcIso(e.start_time),
+        end: ensureUtcIso(e.end_time),
         backgroundColor: bg,
         borderColor: border || bg,
         extendedProps: {
@@ -111,8 +114,11 @@ export default function Calendar() {
           event_type: e.event_type,
           user_id: e.user_id,
           notes: e.notes ?? undefined,
-          raw_start_time: e.start_time,
-          raw_end_time: e.end_time,
+          raw_start_time: ensureUtcIso(e.start_time),
+          raw_end_time: ensureUtcIso(e.end_time),
+          series_id: e.series_id ?? undefined,
+          is_exception: e.is_exception,
+          timezone: e.timezone,
         },
         }
       })
@@ -196,8 +202,9 @@ export default function Calendar() {
                   end_time: typeof ep.raw_end_time === 'string' ? ep.raw_end_time : e.endStr,
                   color: e.backgroundColor || undefined,
                   notes: ep.notes,
-                  linked_event_id: undefined,
-                  recurring_event_id: undefined,
+                  series_id: ep.series_id ?? undefined,
+                  is_exception: !!ep.is_exception,
+                  timezone: ep.timezone || 'UTC',
                 }
                 setSelected(mapped)
                 const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null

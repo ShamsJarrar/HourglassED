@@ -14,6 +14,7 @@ export default function InvitationsModal({ open, onClose, onRefresh }: Props) {
   const [invitations, setInvitations] = useState<EventInvitationWithEvent[] | null>(null)
   const [loadingStates, setLoadingStates] = useState<Record<number, boolean>>({})
   const [classes, setClasses] = useState<EventClassResponse[]>([])
+  const ensureUtcIso = (value: string) => (/([zZ]|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`)
 
   useEffect(() => {
     if (!open) return
@@ -166,13 +167,13 @@ export default function InvitationsModal({ open, onClose, onRefresh }: Props) {
                         <span className="font-medium">Start:</span> {new Intl.DateTimeFormat(undefined, { 
                           dateStyle: 'medium', 
                           timeStyle: 'short' 
-                        }).format(new Date(invitation.event.start_time))}
+                        }).format(new Date(ensureUtcIso(invitation.event.start_time)))}
                       </div>
                       <div>
                         <span className="font-medium">End:</span> {new Intl.DateTimeFormat(undefined, { 
                           dateStyle: 'medium', 
                           timeStyle: 'short' 
-                        }).format(new Date(invitation.event.end_time))}
+                        }).format(new Date(ensureUtcIso(invitation.event.end_time)))}
                       </div>
                     </div>
 
