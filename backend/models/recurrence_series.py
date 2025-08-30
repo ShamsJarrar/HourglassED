@@ -13,5 +13,4 @@ class RecurrenceSeries(Base):
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    user = relationship("User", back_populates="recurrence_series", foreign_keys=[user_id], passive_deletes=True)
     events = relationship("Event", back_populates="series", cascade="all, delete-orphan")

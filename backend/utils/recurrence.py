@@ -204,6 +204,7 @@ def delete_series(db: Session, series_id: int) -> bool:
     return True
 
 
+# celery task
 def ensure_series_window(
     db: Session,
     *,
