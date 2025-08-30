@@ -204,7 +204,8 @@ def delete_series(db: Session, series_id: int) -> bool:
     return True
 
 
-# celery task
+# celery task to be later added to scheduler, for now
+# regenerating series is manual
 def ensure_series_window(
     db: Session,
     *,
