@@ -13,6 +13,6 @@ celery_app.conf.timezone = "UTC"
 celery_app.conf.beat_schedule = {
     "expire-invitations-every-hour": {
         "task": "tasks.expire_passed_invitations",
-        "schedule": crontab(minute="*"), 
+        "schedule": crontab(minute=0), 
     },
 }
