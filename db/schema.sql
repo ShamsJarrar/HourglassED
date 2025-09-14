@@ -88,3 +88,55 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS agent_proposals (
+  proposal_id       BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id           INT NOT NULL,
+  proposal_type     ENUM('create_event','update_event','delete_event','batch_plan') NOT NULL,
+  target_event_id   INT NULL,                         -- for update/delete; NULL for create/batch
+  payload_json      JSON NOT NULL,                    -- data needed to perform the change on approval
+  diff_json         JSON NOT NULL,                    -- before → after (for UI)
+  reasoning_summary VARCHAR(255) NOT NULL,            -- short human-readable reason
+  status            ENUM('pending','committed','rejected','expired') NOT NULL DEFAULT 'pending',
+  expires_at        DATETIME NOT NULL,                -- store in UTC
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_agent_proposals_user
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_agent_proposals_event
+    FOREIGN KEY (target_event_id) REFERENCES events(event_id) ON DELETE SET NULL,
+
+  INDEX idx_agent_proposals_user_status (user_id, status),
+  INDEX idx_agent_proposals_expires (expires_at)
+);
+
+CREATE TABLE IF NOT EXISTS agent_audit_log (
+  log_id       BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT NOT NULL,
+  proposal_id  BIGINT NULL,
+  event        VARCHAR(120) NOT NULL,   -- e.g., 'propose_update_event', 'approve_proposal'
+  payload_json JSON NULL,               -- trimmed args/outputs (no secrets/tokens)
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_audit_user
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_audit_proposal
+    FOREIGN KEY (proposal_id) REFERENCES agent_proposals(proposal_id) ON DELETE SET NULL,
+
+  INDEX idx_audit_user_created (user_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS agent_user_prefs (
+  user_id        INT PRIMARY KEY,
+  timezone       VARCHAR(64) NOT NULL DEFAULT 'Asia/Riyadh',
+  study_windows  JSON NULL,        -- e.g. [{"dow":["Mon","Wed","Thu"],"start":"19:00","end":"21:00"}]
+  no_go_windows  JSON NULL,        -- e.g. [{"dow":["Fri"],"start":"12:00","end":"14:00"}]
+  session_len_m  INT NOT NULL DEFAULT 90,   -- preferred study session length (minutes)
+  buffer_min     INT NOT NULL DEFAULT 10,   -- min buffer between sessions (minutes)
+  naming_rules   JSON NULL,        -- e.g. {"study_prefix":"Study: "}
+  course_prefs   JSON NULL,        -- e.g. {"Algorithms":{"difficulty":4,"target_hours":12}}
+  updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_prefs_user
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
