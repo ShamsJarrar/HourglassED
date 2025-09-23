@@ -8,7 +8,7 @@ class AgentUserPrefs(Base):
     __tablename__ = "agent_user_prefs"
 
     user_id       = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
-    timezone      = Column(String(64), nullable=False, server_default=text("'Asia/Riyadh'"))
+    timezone      = Column(String(64), nullable=False, default="UTC")
     study_windows = Column(JSON, nullable=True)
     no_go_windows = Column(JSON, nullable=True)
     session_len_m = Column(Integer, nullable=False, server_default=text("90"))

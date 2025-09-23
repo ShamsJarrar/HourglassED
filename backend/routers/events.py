@@ -62,8 +62,7 @@ def get_user_events(
     
     filters = []
 
-    # Proper overlap filtering when both bounds are provided:
-    # (event.start < viewEnd) AND (event.end > viewStart)
+    
     if start_time is not None and end_time is not None:
         filters.append(Event.start_time < end_time)
         filters.append(Event.end_time > start_time)
@@ -72,7 +71,7 @@ def get_user_events(
             filters.append(Event.end_time > start_time)
         if end_time is not None:
             filters.append(Event.start_time < end_time)
-    # Filter by any of the selected event types if provided (support 'event_types' and 'event_types[]')
+    
     selected_types = event_types or event_types_alt
     if selected_types:
         filters.append(Event.event_type.in_(selected_types))

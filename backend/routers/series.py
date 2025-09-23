@@ -1,4 +1,3 @@
-from turtle import ht
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user

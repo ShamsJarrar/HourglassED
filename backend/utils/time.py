@@ -9,6 +9,7 @@ except Exception:
     ZoneInfo = None
 
 
+# not used since we are defaulting to UTC for now
 def to_naive_utc(dt: datetime, tz_name: Optional[str] = None) -> datetime:
     """
     To convert a datetime object to a naive UTC datetime object as in the database.

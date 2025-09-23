@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS agent_audit_log (
 
 CREATE TABLE IF NOT EXISTS agent_user_prefs (
   user_id        INT PRIMARY KEY,
-  timezone       VARCHAR(64) NOT NULL DEFAULT 'Asia/Riyadh',
+  timezone       VARCHAR(64) NOT NULL DEFAULT 'UTC',
   study_windows  JSON NULL,        -- e.g. [{"dow":["Mon","Wed","Thu"],"start":"19:00","end":"21:00"}]
   no_go_windows  JSON NULL,        -- e.g. [{"dow":["Fri"],"start":"12:00","end":"14:00"}]
   session_len_m  INT NOT NULL DEFAULT 90,   -- preferred study session length (minutes)
