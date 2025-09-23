@@ -126,6 +126,7 @@ class UpdateDraft(BaseModel):
     end_time: Optional[datetime] = None        
     recurrence_pattern: Optional[str] = None   
     series_id: Optional[int] = None
+    recurrence_end: Optional[datetime] = None
 
 
 class ProposeUpdateRequest(BaseModel):

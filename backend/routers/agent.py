@@ -1,12 +1,11 @@
-from math import e
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 from dependencies import get_db, get_current_user
-from utils.time import to_local_time, now_utc_naive
+from utils.time import to_naive_utc, now_utc_naive
 from utils.agent import expiry_time, audit, build_diff_create, build_diff_update
 from utils.helpers import get_event_class
-from utils.recurrence import create_series_and_seed
+from utils.recurrence import create_series_and_seed, reapply_series_from
 from models.user import User
 from models.event import Event
 from models.event_invitation import EventInvitation, EventInvitationStatus
@@ -15,7 +14,7 @@ from models.agent_user_prefs import AgentUserPrefs
 from models.recurrence_series import RecurrenceSeries
 from schemas.event import EventResponse
 from schemas.agent import AgentUserPrefsResponse, AgentUserPrefsUpdate, AgentProposalResponse, ProposeCreateRequest, ProposeUpdateRequest, ProposeDeleteRequest
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Any, List
 from logger import logger
 
@@ -197,8 +196,8 @@ def propose_create_event(
         "draft": {
             "event_type": event_draft.event_type,                # given as string, but when commited to db, it will be normalized to int
             "title": event_draft.title,
-            "start_time": event_draft.start_time,
-            "end_time": event_draft.end_time,
+            "start_time": to_naive_utc(event_draft.start_time),
+            "end_time": to_naive_utc(event_draft.end_time),
             "timezone": event_draft.timezone,
             "header": event_draft.header,
             "color": event_draft.color,
@@ -264,16 +263,30 @@ def propose_update_event(
 
     
     updates: dict[str, Any] = {}
-    for field in ["event_type", "header", "title", "start_time", "end_time", "color", "notes", "timezone"]:
+    for field in ["event_type", "header", "title", "color", "notes", "timezone"]:
         value = getattr(event_draft, field)
         if value is not None:
             updates[field] = value
+
+    if event_draft.start_time is not None:
+        updates["start_time"] = to_naive_utc(event_draft.start_time)
+
+    if event_draft.end_time is not None:
+        updates["end_time"] = to_naive_utc(event_draft.end_time)
     
     if "start_time" in updates and "end_time" in updates and updates["end_time"] <= updates["start_time"]:
         logger.warning(f"Agent tried to update event {event.event_id} with invalid start and end times")
         raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
-    
+    if event_draft.update_scope == "series":
+        series_updates: dict[str, Any] = {}
+        if event_draft.recurrence_pattern is not None:
+            series_updates["recurrence_pattern"] = event_draft.recurrence_pattern
+        if event_draft.recurrence_end is not None:
+            series_updates["recurrence_end"] = to_naive_utc(event_draft.recurrence_end)
+        
+        if series_updates:
+            updates["series"] = series_updates
 
     payload = {
         "action": "update_event",
@@ -436,6 +449,7 @@ def approve_proposal(
 
             recurrence_pattern = draft.get("recurrence_pattern")
             series_id = draft.get("series_id")
+            recurrence_end = draft.get("recurrence_end")
 
             event_class = get_event_class(draft.get("event_type"), db, user)
 
@@ -450,7 +464,7 @@ def approve_proposal(
                     end_time=draft["end_time"],          # already naive UTC
                     timezone_name=draft.get("timezone") or "UTC",
                     recurrence_pattern=recurrence_pattern,
-                    recurrence_end=None,             # set if you carried it in the proposal
+                    recurrence_end=recurrence_end,             
                     color=draft.get("color"),
                     notes=draft.get("notes"),
                 )
@@ -507,17 +521,21 @@ def approve_proposal(
                 
                 changed = False
                 if "event_type" in updates and event.event_type != updates["event_type"]:
-                    event.event_type = updates["event_type"];
+                    event.event_type = updates["event_type"]
+                    changed = True
 
                 if "start_time" in updates and event.start_time != updates["start_time"]:
-                    event.start_time = updates["start_time"]; changed = True
+                    event.start_time = to_naive_utc(updates["start_time"])
+                    changed = True
 
                 if "end_time" in updates and event.end_time != updates["end_time"]:
-                    event.end_time = updates["end_time"]; changed = True
+                    event.end_time = to_naive_utc(updates["end_time"])
+                    changed = True
 
                 for k in ["header", "title", "color", "notes"]:
                     if k in updates and getattr(event, k) != updates[k]:
-                        setattr(event, k, updates[k]); changed = True
+                        setattr(event, k, updates[k])
+                        changed = True
 
                 if changed:
                     db.flush()
@@ -527,10 +545,33 @@ def approve_proposal(
                     logger.error(f"Agent tried to update event series but no series id was provided")
                     raise HTTPException(status_code=400, detail="series_id required for update_scope='series'")
                 
+                series_updates = updates.get("series") or {}
+                if series_updates:
+                    new_rrule = series_updates.get("recurrence_pattern")
+                    new_end = series_updates.get("recurrence_end")
+                    pivot = payload_json.get("pivot") or now_utc_naive()
+                    months = int(payload_json.get("months") or 6)
+
+                    updated_series = reapply_series_from(
+                        db=db,
+                        series_id=series_id,
+                        pivot=pivot,
+                        new_rrule=new_rrule,
+                        new_recurrence_end=new_end,
+                        window_months=months
+                    )
+
+                    if not updated_series:
+                        logger.error(f"Agent tried to update series but series not found")
+                        raise HTTPException(status_code=400, detail="Series does not exist")
+                
                 event_updates = {}
                 for k in ["event_type", "header", "title", "color", "notes", "start_time", "end_time"]:
                     if k in updates:
-                        event_updates[k] = updates[k]
+                        if k in ("start_time", "end_time"):
+                            event_updates[k] = to_naive_utc(updates[k])
+                        else:
+                            event_updates[k] = updates[k]
 
                 if event_updates:
                     if ("start_time" in event_updates and "end_time" in event_updates and
@@ -568,7 +609,7 @@ def approve_proposal(
             elif scope == "series":
                 if not series_id:
                     logger.error(f"Agent tried to delete event series but no series id was provided")
-                    raise HTTPException(status_code=404, detail="series_id required for delete_scope='series'")
+                    raise HTTPException(status_code=400, detail="series_id required for delete_scope='series'")
                 
                 series = db.query(RecurrenceSeries).filter(
                     RecurrenceSeries.series_id == series_id,
