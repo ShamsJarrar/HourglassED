@@ -16,3 +16,7 @@ celerybeat-schedule-wal
 /frontend/.env
 /frontend/.env.*
 /frontend/*.tsbuildinfo
+
+# Agent
+/agent-mcp/mcpenv/
+/agent-mcp/.env
