@@ -20,3 +20,9 @@ celerybeat-schedule-wal
 # Agent
 /agent-mcp/mcpenv/
 /agent-mcp/.env
+/agent-client/clenv/
+/agent-client/.env
+
+
+# APP
+*.egg-info/ 
