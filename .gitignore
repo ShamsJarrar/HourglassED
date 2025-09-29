@@ -25,4 +25,4 @@ celerybeat-schedule-wal
 
 
 # APP
-*.egg-info/ 
+*.egg-info/
