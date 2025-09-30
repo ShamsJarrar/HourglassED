@@ -11,7 +11,6 @@ from ..mcp_tools import MCPTools, MCPError
 import json
 
 
-tools = MCPTools()
 
 PREF_KEYS = {
     "timezone",
@@ -53,12 +52,17 @@ def _extract_prefs(slots: Dict[str, Any]) -> Dict[str, Any]:
     return output
 
 
-async def ensure_prefs(state: AgentState) -> AgentState:
+async def ensure_prefs(state: AgentState, config: Dict[str, Any] | None = None) -> AgentState:
     """
     - Read prefs (GET /agent/prefs) - backend will create defaults if none exist.
     - If slots include pref-like fields, update prefs (PUT /agent/prefs)
     - Read current prefs into state['prefs']
     """
+    tools: MCPTools = (config or {}).get("tools")
+    if tools is None:
+        state["prefs"] = Prefs()
+        state["prefs_update_error"] = {"detail": "tools_not_initialized"}
+        return state
 
     # Read current prefs
     try:

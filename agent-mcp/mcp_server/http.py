@@ -1,6 +1,6 @@
 import httpx
-from config import AGENT_API_BASE
-from auth import get_headers
+from .config import AGENT_API_BASE
+from .auth import get_headers
 
 async def request_json(method: str, path: str, **kwargs):
     """

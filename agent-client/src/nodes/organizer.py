@@ -179,7 +179,7 @@ def _greedy_planner(
 
 
 
-async def organizer(state: AgentState) -> AgentState:
+async def organizer(state: AgentState, config=None) -> AgentState:
     intent = state.get("intent", "other")
     slots: Slots = state.get("slots", {}) or {}
     prefs: Prefs = state.get("prefs", {}) or {}

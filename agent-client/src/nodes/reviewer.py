@@ -103,7 +103,7 @@ def _remove_duplicate_drafts(drafts: List[Draft]) -> List[Draft]:
 
 
 
-async def reviewer(state: AgentState) -> AgentState:
+async def reviewer(state: AgentState, config=None) -> AgentState:
     drafts: List[Draft] = list(state.get("drafts") or [])
     prefs: Prefs = state.get("prefs") or {}
     calendar: CalendarSnapshot = state.get("calendar") or {}

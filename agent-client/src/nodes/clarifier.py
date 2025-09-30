@@ -85,7 +85,7 @@ def _merge_slots(base: Slots, add: Dict[str, Any]) -> Slots:
     return base
 
 
-async def clarifier(state: AgentState) -> AgentState:
+async def clarifier(state: AgentState, config=None) -> AgentState:
     payload = {
         "intent": state.get("intent"),
         "current_slots": state.get("slots", {}),

@@ -11,6 +11,8 @@ import asyncio
 import os
 
 
+TOOLS: MCPTools | None = None
+
 
 async def _init_mcp_and_set_token(token: Optional[str]) -> None:
     """
@@ -21,12 +23,15 @@ async def _init_mcp_and_set_token(token: Optional[str]) -> None:
     - In development, the token is set here from .env, where it calls 'auth.set_token' tool
     """
 
-    tools = MCPTools()
-    await tools.init_session()
+    global TOOLS
+    if TOOLS is None:
+        TOOLS = MCPTools()
+        await TOOLS.init_session()
+
 
     if token:
         try:
-            await tools.call("auth.set_token", {"auth_token": token})
+            await TOOLS.call("auth.set_token", {"auth_token": token})
             print("MCP token set")
         except Exception as e:
             print(f"Error setting MCP token: {e}")
@@ -52,10 +57,11 @@ async def _run_turn(
     
     state_input = initial_state(user_input, seed_state)
 
+    config = {"tools": TOOLS}
     if hasattr(app, "ainvoke"):
-        response = await app.ainvoke(state_input)
+        response = await app.ainvoke(state_input, config=config)
     elif hasattr(app, "invoke"):
-        response = await app.invoke(state_input)
+        response = await app.invoke(state_input, config=config)
     else:
         raise RuntimeError("App does not have an invoke method")
 
@@ -94,41 +100,45 @@ def main_cli():
 
     print("**Ready. Type '/token <jwt>' to set/replace token or '/exit' to exit \n")
 
-    while True:
-        try:
-            user_input = input("you>>> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nBye!")
-            break
-        
-        if not user_input:
-            continue
-        if user_input.lower() in ('/exit', 'exit', 'quit', '/quit', 'q'):
-            print("\nBye!")
-            break
-        
-        if user_input.startswith('/token'):
-            token = user_input(" ", 1)[1].strip()
+    try:
+        while True:
             try:
-                asyncio.run(_init_mcp_and_set_token(token))
-                print("MCP token updated")
+                user_input = input("you>>> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\nBye!")
+                break
+            
+            if not user_input:
+                continue
+            if user_input.lower() in ('/exit', 'exit', 'quit', '/quit', 'q'):
+                print("\nBye!")
+                break
+            
+            if user_input.startswith('/token'):
+                token = user_input.split(" ", 1)[1].strip()
+                try:
+                    asyncio.run(_init_mcp_and_set_token(token))
+                    print("MCP token updated")
+                except Exception as e:
+                    print(f"Error setting MCP token: {e}")
+                continue
+            
+
+            try:
+                response = asyncio.run(_run_turn(app, user_input, seed_state=seed, dump_state=dump_state))
             except Exception as e:
-                print(f"Error setting MCP token: {e}")
-            continue
-        
+                print(f"Error running turn: {e}")
+                continue
 
-        try:
-            response = asyncio.run(_run_turn(app, user_input, seed_state=seed, dump_state=dump_state))
-        except Exception as e:
-            print(f"Error running turn: {e}")
-            continue
-
-        # for context in the next turn
-        seed = {
-            "slots": response.get("slots", {}),
-            "prefs": response.get("prefs", {}),
-            "calendar": response.get("calendar", {})
-        }
+            # for context in the next turn
+            seed = {
+                "slots": response.get("slots", {}),
+                "prefs": response.get("prefs", {}),
+                "calendar": response.get("calendar", {})
+            }
+    finally:
+        if TOOLS is not None:
+            asyncio.run(TOOLS.aclose())
 
 
 
@@ -154,7 +164,12 @@ async def lifespan(app):
     token = os.getenv("TEMP_USER_ACCESS_TOKEN")
     await _init_mcp_and_set_token(token)
 
-    yield
+    try:
+        yield
+    finally:
+        if TOOLS is not None:
+            asyncio.run(TOOLS.aclose())
+
 
 
 app_http = FastAPI(title="HourglassED Agent", lifespan=lifespan)
@@ -163,14 +178,7 @@ app_http = FastAPI(title="HourglassED Agent", lifespan=lifespan)
 @app_http.get('/health')
 async def health():
     graph_ok = _compiled_graph is not None
-
-    mcp_ok = True
-    try:
-        tools = MCPTools()
-        await tools.init_session()
-    except Exception:
-        mcp_ok = False
-
+    mcp_ok = TOOLS is not None
     return {"ok": graph_ok and mcp_ok, "graph": graph_ok, "mcp": mcp_ok}
 
 
@@ -181,7 +189,7 @@ async def http_set_token(payload: TokenInput):
     stored inside the MCP server (auth.set_token) to access backend APIs.
     """
     try:
-        await _init_mcp_and_set_token(payload.token)
+        await _init_mcp_and_set_token(payload.token)        # reuses TOOLS
     except Exception as e:
         return {'error': str(e)}
     

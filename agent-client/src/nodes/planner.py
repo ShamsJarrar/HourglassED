@@ -144,7 +144,7 @@ def _normalize_slots(raw_slots: Dict[str, Any]) -> Slots:
     return slots
 
 
-async def planner(state: AgentState) -> AgentState:
+async def planner(state: AgentState, config=None) -> AgentState:
     user_input = state.get("user_input") or ""
 
     try:

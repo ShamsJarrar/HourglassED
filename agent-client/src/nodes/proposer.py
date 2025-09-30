@@ -27,7 +27,6 @@ from ..state import AgentState, Draft, Proposals
 from ..mcp_tools import MCPTools, MCPError
 
 
-tools = MCPTools()
 
 
 def _reasoning_summary(state: AgentState) -> str:
@@ -59,7 +58,7 @@ def _reasoning_summary(state: AgentState) -> str:
 
 
 
-async def _propose_event(draft: Draft, reasoning_summary: str) -> Dict[str, Any]:
+async def _propose_event(draft: Draft, reasoning_summary: str, tools: MCPTools) -> Dict[str, Any]:
     """
     Send a single draft to the right propose_* tool
     Returns proposel object or error dict
@@ -101,7 +100,14 @@ async def _propose_event(draft: Draft, reasoning_summary: str) -> Dict[str, Any]
 
 
 
-async def proposer(state: AgentState) -> AgentState:
+async def proposer(state: AgentState, config: Dict[str, Any] | None = None) -> AgentState:
+    tools: MCPTools = (config or {}).get("tools")
+    if tools is None:
+        state["answer"] = "MCP tools not initialized"
+        state["proposals"] = Proposals(items=[])
+        return state
+    
+    
     drafts: List[Draft] = list(state.get("drafts") or [])
     if not drafts:
         state["proposals"] = Proposals(items=[])

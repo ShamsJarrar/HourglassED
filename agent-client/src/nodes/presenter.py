@@ -126,7 +126,7 @@ def _card(proposal: Dict[str, Any], timezone: str) -> str:
 
 
 
-async def presenter(state: AgentState) -> AgentState:
+async def presenter(state: AgentState, config=None) -> AgentState:
     proposals =  state.get("proposals") or {}                               # {"items": [AgentProposalResponse (dict), ...]}
     proposals_list: List[Dict[str, Any]] = proposals.get("items") or []     # [AgentProposalResponse (dict), ...]
 

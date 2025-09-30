@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, START, END
+from langchain_core.runnables import RunnableLambda
 from .state import AgentState
 from .nodes.planner import planner
 from .nodes.clarifier import clarifier
@@ -37,14 +38,14 @@ def build_graph():
     graph = StateGraph(AgentState)
 
     # Nodes
-    graph.add_node("planner", planner)
-    graph.add_node("clarifier", clarifier)
-    graph.add_node("prefs", ensure_prefs)
-    graph.add_node("tools", read_calendar)
-    graph.add_node("organizer", organizer)
-    graph.add_node("reviewer", reviewer)
-    graph.add_node("proposer", proposer)
-    graph.add_node("presenter", presenter)
+    graph.add_node("planner", RunnableLambda(planner))
+    graph.add_node("clarifier", RunnableLambda(clarifier))
+    graph.add_node("prefs", RunnableLambda(ensure_prefs))
+    graph.add_node("tools", RunnableLambda(read_calendar))
+    graph.add_node("organizer", RunnableLambda(organizer))
+    graph.add_node("reviewer", RunnableLambda(reviewer))
+    graph.add_node("proposer", RunnableLambda(proposer))
+    graph.add_node("presenter", RunnableLambda(presenter))
 
     # Edges
     graph.add_edge(START, "planner")

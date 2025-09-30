@@ -11,14 +11,6 @@ from ..mcp_tools import MCPTools, MCPError
 from ..config import DEFAULT_LIST_WINDOWS
 
 
-tools = MCPTools()
-
-
-async def init_tools() -> None:
-    """
-    Dev-tool to push USER_ACCESS_TOKEN to MCP server once at startup.
-    """
-    await tools.init_session()
 
 
 def time_window_from_slots(state: AgentState) -> tuple[str, str]:
@@ -36,7 +28,7 @@ def time_window_from_slots(state: AgentState) -> tuple[str, str]:
     return str(start), str(end)
 
 
-async def read_calendar(state: AgentState) -> AgentState:
+async def read_calendar(state: AgentState, config: Optional[Dict[str, Any]] | None = None) -> AgentState:
     """
     GET:
         - agent.list_events       (bounded by timw window)
@@ -46,6 +38,10 @@ async def read_calendar(state: AgentState) -> AgentState:
     Any transport error is replaced with a placeholder so that
     downstream nodes don't fail.
     """
+    tools: MCPTools = (config or {}).get("tools")
+    if tools is None:
+        state["calendar"] = {"error": "tools_not_initialized"}
+        return state
 
     start, end = time_window_from_slots(state)
     min_block_minutes = int(state.get("slots", {}).get("min_block_minutes") or 60)
