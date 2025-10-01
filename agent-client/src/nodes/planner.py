@@ -20,6 +20,10 @@ from typing import Any, Dict
 from datetime import date, timedelta
 from ..state import AgentState, Slots, Intent
 from ._llm import chat_json
+from langchain_core.messages import AIMessage
+
+
+MAX_CLARIFICATION_CALLS = 2
 
 
 PLANNER_PROMPT = """
@@ -27,7 +31,7 @@ You are the Planner for a student-oriented calender agent.
 Classify the user's intent and extract slots from the user's input.
 
 Valid intents:
-- ask: user asks about events, availability, or status ("what is my schedule tomorrow?")
+- ask: user asks about events, availability, or status. The user could ask about an event on a specific date or week, or if they have any plans in a specific time period ("what is my schedule tomorrow?", "what do i have on wednesday?", "Do I have any plans for the next 2 weeks?")
 - add: user wants to add/update/delete a specific event ("add a study session for tomorrow at 3pm", "move my meeting")
 - plan: create a schedule/time-block plan across days/weeks ('exam', 'subject', 'study_session', 'work', 'personal', 'extracurricular')
 - other: anything else that doesn't fit into the above categories
@@ -48,7 +52,7 @@ Guidance:
 - event_type can be one of these built-in categories:
   exam, subject, study_session, work, personal, extracurricular
   (or other obvious calendar categories such as meeting, workout, etc.)
-- Do not hallucinate values. If you are not sure about a field, leave it out and set needs_clarification=true
+- Do not hallucinate values. If you are not sure about a field, leave it out and set needs_clarification=true. Add the field name to missing_fields list.
 - For plan requests (time-blocking), include any explicit preferences (e.g., mornings, evenings, weekdays).
 - Keep the JSON compact and to the point; do not add extra fields that are not in the schema above.
 """
@@ -85,7 +89,7 @@ def _fallback(input: str) -> Dict[str, Any]:
     elif any(k in text for k in ["add", "create", "schedule", "book", "move", "update", "reschedule", "delete", "cancel"]):
         intent = "add"
 
-    elif any(k in text for k in ["what do i have", "availability", "free time", "free slots", "show my events", "list events"]):
+    elif any(k in text for k in ["what do i have", "availability", "free time", "free slots", "show my events", "list events", "do i have", "what is"]):
         intent = "ask"
     
 
@@ -148,7 +152,11 @@ async def planner(state: AgentState, config=None) -> AgentState:
     user_input = state.get("user_input") or ""
 
     try:
-        response = await chat_json(PLANNER_PROMPT, user_input, "planner_output")
+        response = await chat_json(PLANNER_PROMPT, user_input, "planner_output", state.get("messages", []))
+        msgs = list(state.get("messages", []))
+        msgs.append(AIMessage(content=str(response), name="planner"))
+        state["messages"] = msgs
+
         intent = response.get("intent", "other")
         needs_clarification = bool(response.get("needs_clarification", False))
         slots = _normalize_slots(response.get("slots", {}))
@@ -163,6 +171,14 @@ async def planner(state: AgentState, config=None) -> AgentState:
         state["intent"] = intent
         state["slots"] = slots
         state["needs_clarification"] = needs_clarification
+
+        if state["needs_clarification"]:
+            cnt = int(state.get("clarification_count", 0)) + 1
+            if cnt > MAX_CLARIFICATION_CALLS:
+                state["needs_clarification"] = False
+            else:
+                state["clarification_count"] = cnt
+
         return state
     
     except Exception as e:

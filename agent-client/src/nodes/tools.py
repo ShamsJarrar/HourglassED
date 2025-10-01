@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from ..state import AgentState
 from ..mcp_tools import MCPTools, MCPError
 from ..config import DEFAULT_LIST_WINDOWS
+from langchain_core.runnables import RunnableConfig
 
 
 
@@ -28,7 +29,7 @@ def time_window_from_slots(state: AgentState) -> tuple[str, str]:
     return str(start), str(end)
 
 
-async def read_calendar(state: AgentState, config: Optional[Dict[str, Any]] | None = None) -> AgentState:
+async def read_calendar(state: AgentState, config: RunnableConfig | None = None) -> AgentState:
     """
     GET:
         - agent.list_events       (bounded by timw window)
@@ -38,7 +39,8 @@ async def read_calendar(state: AgentState, config: Optional[Dict[str, Any]] | No
     Any transport error is replaced with a placeholder so that
     downstream nodes don't fail.
     """
-    tools: MCPTools = (config or {}).get("tools")
+    cfg = (config or {}).get("configurable", {})
+    tools: MCPTools = cfg.get("tools")
     if tools is None:
         state["calendar"] = {"error": "tools_not_initialized"}
         return state

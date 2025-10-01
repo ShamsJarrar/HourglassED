@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from ..state import AgentState, Slots, Prefs, CalendarSnapshot, Draft
 from ._llm import chat_json
+from langchain_core.messages import AIMessage
 
 
 ORGANIZER_PROMPT = """
@@ -123,6 +124,16 @@ def _coerce_free_blocks(avail: Any) -> List[Dict[str, Any]]:
     return []
     
 
+def _coerce_events_list(events: Any) -> List[Dict[str, Any]]:
+    """
+    Normalize calendar events into a list of dicts.
+    If MCP call failed and returned an error dict, return an empty list to avoid slicing errors.
+    """
+    if isinstance(events, list):
+        return events
+    return []
+
+
 def _greedy_planner(
     title: str,
     event_type: str,
@@ -188,7 +199,7 @@ async def organizer(state: AgentState, config=None) -> AgentState:
     availability: Dict[str, Any] = calendar.get("availability", {}) or {}
     free_blocks: List[Dict[str, Any]] = _coerce_free_blocks(availability)
 
-    events_list: List[Dict[str, Any]] = calendar.get("events", []) or []
+    events_list: List[Dict[str, Any]] = _coerce_events_list(calendar.get("events", []))
     events_summary = {
         "count": len(events_list),
         "sample_titles": [e.get("title") for e in events_list[:5] if isinstance(e, dict)]
@@ -208,7 +219,11 @@ async def organizer(state: AgentState, config=None) -> AgentState:
         }
     }
 
-    response = await chat_json(ORGANIZER_PROMPT, str(model_input), "organizer_output") or {}
+    response = await chat_json(ORGANIZER_PROMPT, str(model_input), "organizer_output", state.get("messages", [])) or {}
+    msgs = list(state.get("messages", []))
+    msgs.append(AIMessage(content=str(response), name="organizer"))
+    state["messages"] = msgs
+
     drafts_input: List[Draft] = response.get("drafts", []) or []
 
 

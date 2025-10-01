@@ -16,8 +16,9 @@ Outputs:
     state.needs_clarification (bool)
     state.answer (short question/message to present)
 """
-
-from typing import Any, Dict
+from langchain_core.messages import HumanMessage, AIMessage
+from langgraph.types import interrupt
+from typing import Any, Dict, List
 from ..state import AgentState, Slots, Prefs
 from ._llm import chat_json
 
@@ -26,81 +27,42 @@ CLARIFIER_PROMPT = """
 Ypu are the Clarifier for a student-oriented calender agent.
 Ask ONLY the minimal, blocking questions that are needed to proceed with the user's intent.
 
-Rules:
-- For 'add' (create/update/delete event):
-    - If no start_time or end_time is provided: ask for them.
-    - If only a date is given (no time), as for the time range (and timezone if missing).
-    - If recurrence is applied but not given (example: "every Tuesday"), ask for recurrence_pattern and optional recurrence_end.
+You are given the user's request, the slots that have been inferred, and the name of
+the fields that are missing.
+You should ask for the most critical missing field (like time, date, etc)
+Be specific and concise (max ~20 words). Do NOT answer the original request.
 
-- For 'plan':
-    - If hours_needed is missing: ask for estimate OR allow you to estimate based on exam difficutly if relevant.
-    - If study_windows/no_go_windows/timezone are missing: ask for them briefly.
+Return STRICT JSON:
+{
+    "question": str     // the question to ask the user
+}
 
-- For 'ask':
-    - If a time window is ambiguous/missing: ask for a concise range (e.g. "this week", "next 14 days").
-
-
-Keep it concise:
-- Return JSON with:
-  {
-    "still_missing": bool,
-    "message": "one short question or confirmation to the user",
-    "slots": { ...only fields you are confident about... }
-  }
-
-Use only these slot keys if you fill them: 
-title, event_type, start_time, end_time, timezone, notes, color, header,
-series_id, recurrence_pattern, recurrence_end,
-min_block_minutes, title_filter,
-exams, hours_needed, study_windows, no_go_windows.
-
-DO NOT INVENT TIMES; if the user provided only a date, leave times blank and set still_missing=true.
-Prefer ISO-8601 strings for any dates/times you include.
-
-if a preference is missing BUT does not block the current task, do not ask about it now.
 """
 
 
-def _merge_slots(base: Slots, add: Dict[str, Any]) -> Slots:
-    """
-    Guardrail to merge only the allowed slots into the base slots.
-
-    Returns:
-        The merged dict.
-    """
-
-    if not add:
-        return base
-    
-    allowed = {
-        "title","event_type","start_time","end_time","timezone","notes","color","header",
-        "series_id","recurrence_pattern","recurrence_end",
-        "min_block_minutes","title_filter",
-        "exams","hours_needed","study_windows","no_go_windows",
-    }
-    for key, value in add.items():
-        if key in allowed and value is not None:
-            base[key] = value
-    
-    return base
-
-
 async def clarifier(state: AgentState, config=None) -> AgentState:
-    payload = {
-        "intent": state.get("intent"),
-        "current_slots": state.get("slots", {}),
-        "current_prefs": state.get("prefs", {}),
-        "user_input": state.get("user_input")
-    }
+    intent = (state.get("intent") or "").lower()
+    user_q = state.get("user_input") or ""
+    slots: Slots = state.get("slots") or {}
+    missing_fields: List[str] = state.get("missing_fields")
 
-    response = await chat_json(CLARIFIER_PROMPT, str(payload), "clarifier_output") or {}
+    response = await chat_json(
+        system_prompt=CLARIFIER_PROMPT,
+        user_input=f"User asked: {user_q}\n slots: {slots}\n missing_fields: {missing_fields}",
+        history=state.get("messages", [])
+    )
+    msgs = list(state.get("messages", []))
+    msgs.append(AIMessage(content=str(response), name="clarifier"))
+    state["messages"] = msgs
+    
+    question = (response or {}).get("question") if isinstance(response, dict) else None
+    user_reply: str = interrupt(question)
 
-    current_slots: Slots = dict(state.get("slots", {}))
-    merged_slots = _merge_slots(current_slots, response.get("slots", {}))
 
-    state["slots"] = merged_slots
-    state["needs_clarification"] = bool(response.get("still_missing", False))
-    if response.get("message"):
-        state["answer"] = response.get("message")
+    msgs = list(state.get("messages", []))
+    msgs.append(HumanMessage(content=user_reply))
+    state["messages"] = msgs
+
+    missing_fields = []
 
     return state

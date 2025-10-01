@@ -1,4 +1,6 @@
-from typing import TypedDict, List, Dict, Literal, Any, Optional
+from typing import TypedDict, List, Dict, Literal, Any, Optional, Sequence, Annotated
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 
 Intent = Literal["ask", "add", "plan", "other"]
@@ -81,17 +83,21 @@ class AgentState(TypedDict, total=False):
     intent: Intent
     slots: Slots
     needs_clarification: bool
+    missing_fields: List[str]
+    clarification_count: int
 
     calendar: CalendarSnapshot
     prefs: Prefs
 
     drafts: List[Draft]
     review: Review
+    review_count: int
 
     proposals: Proposals
     pending_proposal_id: Optional[int]
 
     answer: Optional[str]
+    messages: Annotated[Sequence[BaseMessage], add_messages]
 
 
 
@@ -101,10 +107,12 @@ def initial_state(user_input: str) -> AgentState:
         intent="other",
         slots=Slots(),
         needs_clarification=False,
+        clarification_count=0,
         calendar=CalendarSnapshot(),
         prefs=Prefs(),
         drafts=[],
         review=Review(issues=[], suggestions=[], score=0),
+        review_count=0,
         proposals=Proposals(items=[]),
         pending_proposal_id=None,
         answer=None

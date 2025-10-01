@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from ..state import AgentState, Slots, Prefs, CalendarSnapshot, Draft, Review
 from ._llm import chat_json
+from langchain_core.messages import AIMessage
 
 
 REVIEWER_PROMPT = """
@@ -115,7 +116,10 @@ async def reviewer(state: AgentState, config=None) -> AgentState:
         "calendar": calendar,
         "drafts": refined_drafts
     }
-    response = await chat_json(REVIEWER_PROMPT, str(payload), "reviewer") or {}
+    response = await chat_json(REVIEWER_PROMPT, str(payload), "reviewer", state.get("messages", [])) or {}
+    msgs = list(state.get("messages", []))
+    msgs.append(AIMessage(content=str(response), name="reviewer"))
+    state["messages"] = msgs
 
     issues = [str(x) for x in (response.get("issues") or [])][:12]
     suggestions = [str(x) for x in (response.get("suggestions") or [])][:6]
@@ -139,4 +143,5 @@ async def reviewer(state: AgentState, config=None) -> AgentState:
         suggestions=suggestions,
         score=score
     )
+    state["review_count"] = state.get("review_count", 0) + 1
     return state

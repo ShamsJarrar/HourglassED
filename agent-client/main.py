@@ -1,3 +1,4 @@
+from langchain_core.messages import HumanMessage, AIMessage
 from src.build_graph import build_graph
 from src.mcp_tools import MCPTools
 from src.state import initial_state
@@ -43,8 +44,8 @@ def _compile_graph():
 
 async def _run_turn(
     app, 
-    user_input: str, 
-    seed_state: Optional[Dict[str, Any]] = None, 
+    user_input: str,
+    prev_state: Optional[Dict[str, Any]] = None,
     dump_state: bool = False
 ) -> Dict[str, Any]:
     """
@@ -54,16 +55,26 @@ async def _run_turn(
     - Print either state['answer'] or full state if dump_state is True
     - return state
     """
-    
-    state_input = initial_state(user_input, seed_state)
 
-    config = {"tools": TOOLS}
+    if not prev_state:
+        state_input = initial_state(user_input)  
+        state_input["messages"] = [HumanMessage(content=user_input)]
+    else:
+        state_input = dict(prev_state)
+        state_input["user_input"] = user_input
+        state_input["messages"] = [HumanMessage(content=user_input)]
+
+
+    config = {"configurable": {"tools": TOOLS}}
     if hasattr(app, "ainvoke"):
         response = await app.ainvoke(state_input, config=config)
     elif hasattr(app, "invoke"):
         response = await app.invoke(state_input, config=config)
     else:
         raise RuntimeError("App does not have an invoke method")
+    
+
+    answer = response.get("answer")
 
     
     if dump_state:
@@ -95,12 +106,12 @@ def main_cli():
     asyncio.run(_init_mcp_and_set_token(start_token))
 
     app = _compile_graph()
-    dump_state = False
-    seed: Dict[str, Any] = {}
+    dump_state = True
 
     print("**Ready. Type '/token <jwt>' to set/replace token or '/exit' to exit \n")
 
     try:
+        running_state = None
         while True:
             try:
                 user_input = input("you>>> ").strip()
@@ -125,17 +136,12 @@ def main_cli():
             
 
             try:
-                response = asyncio.run(_run_turn(app, user_input, seed_state=seed, dump_state=dump_state))
+                response = asyncio.run(_run_turn(app, user_input, prev_state=running_state, dump_state=dump_state))
+                running_state = response
             except Exception as e:
                 print(f"Error running turn: {e}")
                 continue
 
-            # for context in the next turn
-            seed = {
-                "slots": response.get("slots", {}),
-                "prefs": response.get("prefs", {}),
-                "calendar": response.get("calendar", {})
-            }
     finally:
         if TOOLS is not None:
             asyncio.run(TOOLS.aclose())
@@ -209,7 +215,7 @@ async def http_turn(payload: TurnInput):
         response = await _run_turn(
             _compiled_graph,
             payload.user_input,
-            seed_state=payload.state,
+            prev_state=payload.state,
             dump_state=payload.dump_state
         )
         return response

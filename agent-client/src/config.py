@@ -4,6 +4,7 @@ import os
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 MCP_URL = os.getenv("MCP_URL", "http://127.0.0.1:8765/mcp").rstrip("/")
 AGENT_HOST=os.getenv("AGENT_HOST", "127.0.0.1")
 AGENT_PORT=os.getenv("AGENT_PORT", "5057")

@@ -8,10 +8,11 @@ Usage:
 """
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from typing import Any, Dict
+from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
+from typing import Any, Dict, Optional, Sequence
 import json
-from ..config import OPENROUTER_API_KEY
+from ..config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL
+import traceback
 
 try:
     from openai import AsyncOpenAI
@@ -24,11 +25,16 @@ except Exception as e:
 llm = ChatOpenAI(
     api_key=OPENROUTER_API_KEY, 
     model="gpt-4o-mini",
-    temperature=0.1,
+    base_url=OPENROUTER_BASE_URL
 )
 
 
-async def chat_json(system_prompt: str, user_input: str, schema_name: str = "json_object") -> Dict[str, Any]:
+async def chat_json(
+    system_prompt: str, 
+    user_input: str, 
+    schema_name: str = "json_object", 
+    history: Optional[Sequence[BaseMessage]] = None
+) -> Dict[str, Any]:
     """
     Call the LLM with system+user prompts and ask for strict JSON output.
 
@@ -37,9 +43,13 @@ async def chat_json(system_prompt: str, user_input: str, schema_name: str = "jso
     """
     
     try:
-        messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_input)]
+        messages = list(history or [])
+        messages.append(SystemMessage(content=system_prompt))
+        messages.append(HumanMessage(content=user_input))
         response = await llm.ainvoke(messages)
         return json.loads(response.content)
     
     except Exception as e:
+        traceback.print_exc()
+        print("LLM ERROR:", repr(e))
         return {}

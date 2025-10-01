@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from ..state import AgentState, Prefs, CalendarSnapshot
+from ._llm import chat_json
+from langchain_core.messages import AIMessage
 
 
 def _get_timezone(state: AgentState) -> str:
@@ -127,6 +129,69 @@ def _card(proposal: Dict[str, Any], timezone: str) -> str:
 
 
 async def presenter(state: AgentState, config=None) -> AgentState:
+    intent = (state.get("intent") or "").lower()
+    # ASK Intent
+    if intent == "ask":
+        user_input = state.get("user_input") or ""
+        calender = state.get("calendar") or {}
+
+        PROMPT = f"""
+        You are a helpful scheduling assistant.
+
+        The user will ask a question about their calendar.
+        You are given calendar context below:
+        {calender}
+
+        Please answer the question directly in natural language.
+        - If the user asked about availability, summarize busy/free slots.
+        - If the user asked about events, list their header, titles, and times.
+        - Be concise but clear.
+
+        Return STRICT JSON:
+        {
+            "text": str
+        }
+        """
+
+        response = await chat_json(PROMPT, user_input, history=state.get("history") or [])
+        msgs = list(state.get("messages", []))
+        msgs.append(AIMessage(content=str(response), name="presenter"))
+        state["messages"] = msgs
+
+        state["answer"] = response.get("text") if isinstance(response, dict) else str(response)
+        return state
+    
+    if intent == "other":
+        user_input = state.get("user_input") or ""
+        calender = state.get("calendar") or {}
+
+        PROMPT = """
+        You are a helpful scheduling assistant.
+
+        The user will asked a question that could be related to their calendar,
+        but not necessarily about their calendar.
+
+        Here is some calendar context if you need:
+        {calender}
+
+        Do you your best to answer the question in natural language.
+
+        Return STRICT JSON:
+        {
+            "text": str
+        }
+        """
+        response = await chat_json(PROMPT, user_input, history=state.get("history") or [])
+        msgs = list(state.get("messages", []))
+        msgs.append(AIMessage(content=str(response), name="presenter"))
+        state["messages"] = msgs
+
+        state["answer"] = response.get("text") if isinstance(response, dict) else str(response)
+        return state
+
+
+
+    # ADD/PLAN/OTHER Intent
     proposals =  state.get("proposals") or {}                               # {"items": [AgentProposalResponse (dict), ...]}
     proposals_list: List[Dict[str, Any]] = proposals.get("items") or []     # [AgentProposalResponse (dict), ...]
 

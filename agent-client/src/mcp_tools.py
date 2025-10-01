@@ -35,14 +35,30 @@ class MCPTools:
             await self._client.__aenter__()
         return self._client
 
+    async def _reconnect(self) -> Client:
+        try:
+            if self._client is not None:
+                await self._client.__aexit__(None, None, None)
+        except Exception:
+            pass
+        self._client = Client(self.base_url)
+        await self._client.__aenter__()
+        return self._client
+
 
     async def call(self, tool_name: str, args: Dict[str, Any]) -> Any:
         client = await self._ensure_client()
         try:
             result = await client.call_tool(tool_name, args or {})
             return getattr(result, 'data', result)
-        except Exception as e:
-            raise MCPError(str(e))
+        except Exception:
+            # Reconnect once and retry
+            client = await self._reconnect()
+            try:
+                result = await client.call_tool(tool_name, args or {})
+                return getattr(result, 'data', result)
+            except Exception as e:
+                raise MCPError(str(e))
     
 
     async def set_token(self, token: str) -> Any:

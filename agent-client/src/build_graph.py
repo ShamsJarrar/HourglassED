@@ -12,24 +12,26 @@ from .nodes.presenter import presenter
 from typing import Any
 
 
+REVIEW_SCORE_THRESHOLD = 0.6
+REVIEW_COUNT_THRESHOLD = 3
+
+
 # ROUTERS
-def _needs_clarification(state: AgentState) -> str:
-    """
-    After planner:
-        if needs_clarification is True route to 'clarifier' 
-        else route to 'prefs'
-    """
-
-    return "clarifier" if state["needs_clarification"] else "prefs"
+def router_after_planner(state: AgentState) -> str:
+    if state["needs_clarification"]:
+        return "clarifier"
+    intent = (state.get("intent") or "other").lower()
+    return "tools" if intent in ["ask", "other"] else "prefs"
 
 
-def _clarifier_next(state: AgentState) -> str:
-    """
-    After clarifier:
-        if information is still missing, END so UI can ask for missing info.
-        else proceed to 'prefs'
-    """
-    return END if state["needs_clarification"] else "prefs"
+def router_after_tools(state: AgentState) -> str:
+    return "presenter" if (state.get("intent") or "").lower() in ["ask", "other"] else "organizer"
+
+
+def router_after_reviewer(state: AgentState) -> str:
+    review = state.get("review") or {}
+    score = float(review.get("score", 1.0))
+    return "organizer" if (score < REVIEW_SCORE_THRESHOLD and state.get("review_count", 3) < REVIEW_COUNT_THRESHOLD) else "proposer"
 
 
 
@@ -52,28 +54,39 @@ def build_graph():
 
     graph.add_conditional_edges(
         "planner",
-        _needs_clarification,
+        router_after_planner,
         {
-            'clarifier': 'clarifier',
-            'prefs': 'prefs'
+            "clarifier": "clarifier",
+            "tools": "tools",
+            "prefs": "prefs"
         }
     )
+
+    graph.add_edge("clarifier", "planner")
+    graph.add_edge("prefs", "tools")
 
     graph.add_conditional_edges(
-        'clarifier',
-        _clarifier_next,
+        "tools",
+        router_after_tools,
         {
-            END: END,
-            'prefs': 'prefs'
+            "presenter": "presenter",
+            "organizer": "organizer"
         }
     )
 
-    graph.add_edge('prefs', 'tools')
-    graph.add_edge('tools', 'organizer')
-    graph.add_edge('organizer', 'reviewer')
-    graph.add_edge('reviewer', 'proposer')
-    graph.add_edge('proposer', 'presenter')
-    graph.add_edge('presenter', END)
+    graph.add_edge("organizer", "reviewer")
+
+    graph.add_conditional_edges(
+        "reviewer",
+        router_after_reviewer,
+        {
+            "organizer": "organizer",
+            "proposer": "proposer"
+        }
+    )
+
+    graph.add_edge("proposer", "presenter")
+    graph.add_edge("presenter", END)
 
     
     return graph.compile()

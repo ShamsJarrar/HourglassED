@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional
 import json
 from ..state import AgentState, Draft, Proposals
 from ..mcp_tools import MCPTools, MCPError
+from langchain_core.runnables import RunnableConfig 
 
 
 
@@ -100,8 +101,9 @@ async def _propose_event(draft: Draft, reasoning_summary: str, tools: MCPTools) 
 
 
 
-async def proposer(state: AgentState, config: Dict[str, Any] | None = None) -> AgentState:
-    tools: MCPTools = (config or {}).get("tools")
+async def proposer(state: AgentState, config: RunnableConfig | None = None) -> AgentState:
+    cfg = (config or {}).get("configurable", {})
+    tools: MCPTools = cfg.get("tools")
     if tools is None:
         state["answer"] = "MCP tools not initialized"
         state["proposals"] = Proposals(items=[])
@@ -121,7 +123,7 @@ async def proposer(state: AgentState, config: Dict[str, Any] | None = None) -> A
     errors: List[Dict[str, Any]] = []
 
     for d in drafts:
-        response = await _propose_event(d, reasoning_summary)
+        response = await _propose_event(d, reasoning_summary, tools)
         if response.get("ok"):
             proposal = response.get("proposal") or {}
             proposals.append(proposal)
