@@ -47,14 +47,17 @@ Return a compact JSON object: {"intent": <str>, "slots": <obj>, "needs_clarifica
 
 
 Guidance:
-- Prefer ISO-8601 formatted dates/times. If the user gives a dat without a time, don't invent time.
-  Put only the date as ISO (e.g., "2025-10-20") and set needs_clarification=true
+- Prefer ISO-8601 formatted dates/times. If the user gives a dat without a time, don't invent time. Assume the user means 12:00 AM start time and 11:59 PM end time.
 - event_type can be one of these built-in categories:
   exam, subject, study_session, work, personal, extracurricular
   (or other obvious calendar categories such as meeting, workout, etc.)
 - Do not hallucinate values. If you are not sure about a field, leave it out and set needs_clarification=true. Add the field name to missing_fields list.
 - For plan requests (time-blocking), include any explicit preferences (e.g., mornings, evenings, weekdays).
 - Keep the JSON compact and to the point; do not add extra fields that are not in the schema above.
+
+example:
+User: "Did I have anything planned on 20th August 2025 at 3pm?
+Planner Output: {"intent": "ask", "slots": {"start_time": "2025-08-20T15:00:00", "end_time": "2025-08-20T15:59:59"}, "needs_clarification": false}
 """
 
 

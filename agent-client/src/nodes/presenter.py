@@ -148,9 +148,9 @@ async def presenter(state: AgentState, config=None) -> AgentState:
         - Be concise but clear.
 
         Return STRICT JSON:
-        {
+        {{
             "text": str
-        }
+        }}
         """
 
         response = await chat_json(PROMPT, user_input, history=state.get("history") or [])
@@ -165,7 +165,7 @@ async def presenter(state: AgentState, config=None) -> AgentState:
         user_input = state.get("user_input") or ""
         calender = state.get("calendar") or {}
 
-        PROMPT = """
+        PROMPT = f"""
         You are a helpful scheduling assistant.
 
         The user will asked a question that could be related to their calendar,
@@ -177,9 +177,9 @@ async def presenter(state: AgentState, config=None) -> AgentState:
         Do you your best to answer the question in natural language.
 
         Return STRICT JSON:
-        {
+        {{
             "text": str
-        }
+        }}
         """
         response = await chat_json(PROMPT, user_input, history=state.get("history") or [])
         msgs = list(state.get("messages", []))

@@ -26,7 +26,7 @@ llm = ChatOpenAI(
     api_key=OPENROUTER_API_KEY, 
     model="gpt-4o-mini",
     base_url=OPENROUTER_BASE_URL
-)
+).bind(response_format={"type": "json_object"})
 
 
 async def chat_json(
