@@ -13,12 +13,12 @@ async def run_graph(graph, input_state: dict, config) -> AgentResponse:
     response = await graph.ainvoke(input_state, config=config)
     state = await graph.aget_state(config)
     next_nodes = state.next or []
-    run_status = "user_feedback" if "human_feedback" in next_nodes else "finished"
+    run_state = "user_feedback" if "human_feedback" in next_nodes else "finished"
     thread_id = config['configurable']['thread_id']
 
     return AgentResponse(
         thread_id=thread_id,
-        run_status=run_status,
+        run_state=run_state,
         answer=response.get('answer', ''),
         proposed_events=response.get('proposed_events', [])
     )
@@ -56,7 +56,7 @@ async def start(
     }
     
 
-    return await run_graph(graph, initial_request, config)
+    return await run_graph(graph, initial_state, config)
 
 
 @router.post('/resume', response_model=AgentResponse)
@@ -78,5 +78,5 @@ async def resume(
 
     await graph.aupdate_state(config, state_update)
 
-    return await run_graph(graph, None, config)
+    return await run_graph(graph, {}, config)
 
