@@ -11,3 +11,8 @@ celery
 redis
 django-celery-beat
 sendgrid==6.12.4
+langgraph
+langchain
+langchain-openai
+langchain-mcp-adapters
+langgraph-checkpoint-mysql[aiomysql]
