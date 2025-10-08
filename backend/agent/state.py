@@ -14,7 +14,7 @@ class createSeriesWithEvents(BaseModel):
 
 class OrganizerReply(BaseModel):
     answer: str
-    proposed_events: Annotated[List[Union[EventCreate, createSeriesWithEvents]]] = []
+    proposed_events: Annotated[List[Union[EventCreate, createSeriesWithEvents]], add] = []
 
 
 class AgentState(TypedDict):

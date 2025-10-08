@@ -5,13 +5,32 @@ from sqlalchemy import text
 from fastapi import Depends
 from dependencies import get_db
 from init_db import create_tables
-from routers import auth, friends, events, event_invitations, notifications, event_classes, series
+from routers import auth, friends, events, event_invitations, notifications, event_classes, series, agent
+from contextlib import asynccontextmanager
+from langgraph.checkpoint.mysql.aio import AIOMySQLSaver
+from agent.graph import get_graph
 from logger import logger
+from dotenv import load_dotenv
+import os
+
 
 
 create_tables()
 
-app = FastAPI()
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with AIOMySQLSaver.from_conn_string(DATABASE_URL) as checkpointer:
+        app.state.graph = await get_graph(checkpointer)
+        app.state.checkpointer = checkpointer
+        
+        yield
+        
+
+app = FastAPI(lifespan=lifespan)
 
 
 origins = [
@@ -35,6 +54,7 @@ app.include_router(event_invitations.router)
 app.include_router(notifications.router)
 app.include_router(event_classes.router)
 app.include_router(series.router)
+app.include_router(agent.router)
 
 logger.info("HourglassED API starting!")
 

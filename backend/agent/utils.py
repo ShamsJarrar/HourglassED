@@ -1,9 +1,9 @@
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import BaseMessage
 from datetime import datetime, timezone
 from typing import Union, Any, Tuple
 import json
 
-def _get_text_from_tool_message(message: ToolMessage) -> str:
+def _get_text_from_message(message: BaseMessage) -> str:
     if isinstance(message.content, str):
         return message.content
     if isinstance(message.content, list):
