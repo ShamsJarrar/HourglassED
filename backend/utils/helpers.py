@@ -16,6 +16,15 @@ def get_event_class(
         user: User
 ) -> EventClass:
 
+    # If a numeric id is passed (e.g. "17"), resolve by id instead of creating a
+    # new custom class named "17". This guards against upstream callers that send
+    # class ids rather than names.
+    if isinstance(event_class_name, str) and event_class_name.strip().isdigit():
+        class_id = int(event_class_name.strip())
+        event_class = db.query(EventClass).filter(EventClass.class_id == class_id).first()
+        if event_class:
+            return event_class
+
     event_class_name = normalize_string(event_class_name)
 
     # check if event class is builtin

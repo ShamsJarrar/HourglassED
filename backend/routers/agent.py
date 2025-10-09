@@ -9,18 +9,39 @@ from models.user import User
 router = APIRouter(prefix='/agent', tags=['Agent'])
 
 
-async def run_graph(graph, input_state: dict, config) -> AgentResponse:
+async def run_graph(graph, input_state, config) -> AgentResponse:
     response = await graph.ainvoke(input_state, config=config)
     state = await graph.aget_state(config)
     next_nodes = state.next or []
     run_state = "user_feedback" if "human_feedback" in next_nodes else "finished"
     thread_id = config['configurable']['thread_id']
 
+    # Normalize proposed_events to satisfy pydantic models
+    raw_props = response.get('proposed_events', []) or []
+    normalized_props = []
+    for item in raw_props:
+        try:
+            if isinstance(item, dict) and 'recurrence' in item and 'event' in item:
+                ev = item.get('event') or {}
+                if isinstance(ev, dict) and isinstance(ev.get('event_type'), int):
+                    ev = {**ev, 'event_type': str(ev['event_type'])}
+                rec = item.get('recurrence') or {}
+                normalized_props.append({'recurrence': rec, 'event': ev})
+            elif isinstance(item, dict):
+                if isinstance(item.get('event_type'), int):
+                    item = {**item, 'event_type': str(item['event_type'])}
+                normalized_props.append(item)
+            else:
+                normalized_props.append(item)
+        except Exception:
+            # If normalization fails, skip invalid proposal
+            continue
+
     return AgentResponse(
         thread_id=thread_id,
         run_state=run_state,
         answer=response.get('answer', ''),
-        proposed_events=response.get('proposed_events', [])
+        proposed_events=normalized_props
     )
 
 
@@ -51,8 +72,11 @@ async def start(
         "answer": "",
         "calendar": [],
         "max_tool_calls": initial_request.max_tool_calls if hasattr(initial_request, "max_tool_calls") else 4,
+        "tool_calls_used": 0,
         "status": "approved",
         "access_token": token,
+        "client_now_iso": getattr(initial_request, 'client_now_iso', None),
+        "client_timezone": getattr(initial_request, 'client_timezone', None),
     }
     
 
@@ -78,5 +102,5 @@ async def resume(
 
     await graph.aupdate_state(config, state_update)
 
-    return await run_graph(graph, {}, config)
+    return await run_graph(graph, None, config)
 

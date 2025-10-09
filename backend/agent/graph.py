@@ -69,25 +69,31 @@ async def get_graph(checkpointer):
         answer = state.get("answer")
         calendar = state.get("calendar", [])
         max_tool_calls = state.get("max_tool_calls", 4)
+        tool_calls_used = state.get("tool_calls_used", 0)
         status = state.get("status", "approved")
         proposed_events = state.get("proposed_events", [])
+        client_now_iso = state.get("client_now_iso")
+        client_timezone = state.get("client_timezone")
 
 
         initial_system_prompt = SystemMessage(content=f"""
         You are an organizer assistant for a student-oriented calendar app. Your job is to help the user
         organize their schedule based on their input.
 
-        Use ONLY the read-only tools:
-        - get_events
-        - get_event
-        - get_series
+        Tool usage policy (critical):
+        - Before forming your answer, FIRST call get_events() to read the user's calendar. If unsure about dates, fetch without filters and scan titles/notes for relevant items from the user's request (e.g., exams, classes). Do not ask the human for dates that you can discover from the calendar.
+        - If an event has a series_id, call get_series to understand recurrence.
+        - Use ONLY these read-only tools:
+          - get_events
+          - get_event
+          - get_series
+        - You may call tools up to {max_tool_calls} times.
 
-        You may call tools up to {max_tool_calls} times.
-
+        Use the user's current time context to ground scheduling:
+        - Current time (client): {client_now_iso or 'unknown'}
+        - Client timezone: {client_timezone or 'unknown'}
         Times must be ISO 8601 with offset or Z (e.g., 2025-10-06T09:00:00-04:00 or 2025-10-06T13:00:00Z).
         Use the timezone of the user's current location.
-
-        If an event has a series_id, fetch the series to see recurrence details.
 
         After fetching what you need, return ONLY JSON in this exact shape:
         {{
@@ -118,6 +124,8 @@ async def get_graph(checkpointer):
         }}
 
         Current calendar snapshot (read-only): {calendar}
+        ALWAYS RETURN STRICT JSON IN THE REQUIRED SCHEMA.
+        FILL OUT ALL NON OPTIONAL FIELDS WHEN PROPOSING EVENTS.
         """)
 
         feedback_system_prompt = SystemMessage(content=f"""
@@ -126,16 +134,19 @@ async def get_graph(checkpointer):
 
         Previous answer: {answer}
         Previous proposed_events: {proposed_events}
-        User feedback: {user_feedback}
+        User initial request (you already answered this): {user_input}
         Current read-only calendar snapshot: {calendar}
 
-        If you need more information, you can call the tools again.
+        If you need more information, call the tools again. Prefer calling get_events first to read the calendar before asking the human.
         You can only call the tools upto {max_tool_calls} times.
         Use ONLY the read-only tools:
         - get_events
         - get_event
         - get_series
 
+        Use the user's current time context to ground scheduling:
+        - Current time (client): {client_now_iso or 'unknown'}
+        - Client timezone: {client_timezone or 'unknown'}
         Times must be ISO 8601 with offset or Z (e.g., 2025-10-06T09:00:00-04:00 or 2025-10-06T13:00:00Z).
         Use the timezone of the user's current location.
 
@@ -146,16 +157,17 @@ async def get_graph(checkpointer):
         "answer": "your revised response here",
         "proposed_events": [ /* updated proposals or [] */ ]
         }}
+        ALWAYS RETURN STRICT JSON IN THE REQUIRED SCHEMA.
+        FILL OUT ALL NON OPTIONAL FIELDS WHEN PROPOSING EVENTS.
         """)
 
 
         if status == "feedback" and user_feedback:
             messages: List[BaseMessage] = [
                 feedback_system_prompt,
-                *state["messages"],
                 HumanMessage(content=user_feedback),
             ]
-        
+
         else:
             messages = [
                 initial_system_prompt,
@@ -165,26 +177,84 @@ async def get_graph(checkpointer):
         response = await model.ainvoke(messages)
 
         if getattr(response, "tool_calls", None):
-            return {"messages": messages + [response]}
+            requested_tool_calls = len(getattr(response, "tool_calls", []) or [])
+            if tool_calls_used + requested_tool_calls > max_tool_calls:
+                # Budget exhausted → force model to answer without calling tools
+                budget_prompt = SystemMessage(content=(
+                    "Tool budget exhausted. Do NOT call any tools. "
+                    "Using only the provided context (including Current calendar snapshot), "
+                    "produce the final JSON response exactly in the required schema."
+                ))
+
+                if status == "feedback" and user_feedback:
+                    no_tool_messages: List[BaseMessage] = [
+                        feedback_system_prompt,
+                        budget_prompt,
+                        HumanMessage(content=user_feedback),
+                    ]
+                else:
+                    no_tool_messages = [
+                        initial_system_prompt,
+                        budget_prompt,
+                        HumanMessage(content=user_input)
+                    ]
+
+                forced = await model.ainvoke(no_tool_messages)
+                # If the model still attempts tool calls, return a final minimal answer
+                if getattr(forced, "tool_calls", None):
+                    return {
+                        "messages": messages,
+                        "answer": "Unable to call more tools. Please adjust and try again.",
+                        "proposed_events": []
+                    }
+
+                response = forced
+            else:
+                return {"messages": messages + [response], "tool_calls_used": tool_calls_used + requested_tool_calls}
         
 
         raw_output = _get_text_from_message(response).strip()
+        def _extract_json(text: str):
+            if not text:
+                return None
+            # Try fenced code block ```json ... ``` or ``` ... ```
+            import re
+            fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=re.IGNORECASE)
+            candidate = fence.group(1) if fence else None
+            if candidate:
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    pass
+            # Try substring from first { to last }
+            start = text.find('{')
+            end = text.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                snippet = text[start:end+1]
+                try:
+                    return json.loads(snippet)
+                except json.JSONDecodeError:
+                    pass
+            return None
+
         try:
             parsed = json.loads(raw_output) if raw_output else None
         except json.JSONDecodeError:
-            return {
-                "messages": messages + [response],
-                "answer": raw_output or "",
-                "proposed_events": []
-            }
+            parsed = _extract_json(raw_output)
+            if parsed is None:
+                return {
+                    "messages": messages + [response],
+                    "answer": raw_output or "",
+                    "proposed_events": []
+                }
         
         try:
             validated_response = OrganizerReply.model_validate(parsed)
         except ValidationError:
             return {
                 "messages": messages + [response],
-                'answer': parsed.get('answer') if isinstance(parsed, dict) else raw_output,
-                "proposed_events": []
+                'answer': (parsed.get('answer') if isinstance(parsed, dict) else raw_output) if parsed is not None else raw_output,
+                "proposed_events": (parsed.get('proposed_events') if isinstance(parsed, dict) else []) if parsed is not None else []
             }
         
         ai_message = AIMessage(content=json.dumps(validated_response.model_dump(mode="json")))
@@ -214,21 +284,51 @@ async def get_graph(checkpointer):
         
         tool_name = (last_tool_message.name).strip()
 
+        # Normalize potential double-encoded JSON from MCP tools
+        def _ensure_dict(obj):
+            if isinstance(obj, dict):
+                return obj
+            if isinstance(obj, str):
+                try:
+                    parsed = json.loads(obj)
+                    return parsed if isinstance(parsed, dict) else None
+                except json.JSONDecodeError:
+                    return None
+            return None
+
         if tool_name == "get_events" and isinstance(data, list):
-            items = [EventResponse.model_validate(x) for x in data]
+            normalized = []
+            for item in data:
+                if isinstance(item, dict):
+                    normalized.append(item)
+                elif isinstance(item, str):
+                    parsed = _ensure_dict(item)
+                    if parsed is not None:
+                        normalized.append(parsed)
+            items = [EventResponse.model_validate(x) for x in normalized]
             return {"calendar": items}
         
-        if tool_name == "get_event" and isinstance(data, dict):
-            return {"calendar": [EventResponse.model_validate(data)]}
+        if tool_name == "get_event":
+            if isinstance(data, dict):
+                return {"calendar": [EventResponse.model_validate(data)]}
+            if isinstance(data, str):
+                parsed = _ensure_dict(data)
+                if parsed is not None:
+                    return {"calendar": [EventResponse.model_validate(parsed)]}
         
-        if tool_name == "get_series" and isinstance(data, dict):
-            return {"calendar": [RecurrenceSeriesResponse.model_validate(data)]}
+        if tool_name == "get_series":
+            if isinstance(data, dict):
+                return {"calendar": [RecurrenceSeriesResponse.model_validate(data)]}
+            if isinstance(data, str):
+                parsed = _ensure_dict(data)
+                if parsed is not None:
+                    return {"calendar": [RecurrenceSeriesResponse.model_validate(parsed)]}
         
         return {}
 
 
     async def human_feedback(state: AgentState):
-        pass
+        return {}
 
 
     async def commit_proposed_events(state: AgentState) -> AgentState:
@@ -256,7 +356,7 @@ async def get_graph(checkpointer):
             if is_series:
                 args = {
                     "recurrence_pattern": recurrence.get("recurrence_pattern"),
-                    "event_type": event.get("event_type"),
+                    "event_type": str(event.get("event_type")) if event.get("event_type") is not None else None,
                     "title": event.get("title"),
                     "start_time": _iso(event.get("start_time")),
                     "end_time": _iso(event.get("end_time")),
@@ -287,7 +387,7 @@ async def get_graph(checkpointer):
             
             else:
                 args = {
-                    "event_type": event.get("event_type"),
+                    "event_type": str(event.get("event_type")) if event.get("event_type") is not None else None,
                     "title": event.get("title"),
                     "start_time": _iso(event.get("start_time")),
                     "end_time": _iso(event.get("end_time")),
@@ -337,12 +437,14 @@ async def get_graph(checkpointer):
     def after_human_interrupt(state: AgentState):
         current_state = state['status']
 
+        # Return branch KEYS that were registered in add_conditional_edges,
+        # not node names. The mapping below expects: 'approved' | 'feedback' | 'skip'.
         if current_state == "approved":
-            return 'commit_proposed_events'
+            return 'approved'
         elif current_state == "feedback":
-            return 'organizer'
+            return 'feedback'
         else:
-            return END
+            return 'skip'
 
 
 

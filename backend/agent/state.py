@@ -14,16 +14,21 @@ class createSeriesWithEvents(BaseModel):
 
 class OrganizerReply(BaseModel):
     answer: str
-    proposed_events: Annotated[List[Union[EventCreate, createSeriesWithEvents]], add] = []
+    # Do NOT accumulate proposed events across runs; each reply overwrites
+    proposed_events: List[Union[EventCreate, createSeriesWithEvents]] = []
 
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]	  # chat history
     user_input: str
     user_feedback: Optional[str]
-    proposed_events: Annotated[List[EventCreate | createSeriesWithEvents], add]
+    # Clear and replace on each validated model output, not reduce/add
+    proposed_events: List[EventCreate | createSeriesWithEvents]
     answer: str
     calendar: Annotated[List[EventResponse | RecurrenceSeriesResponse], add]
     max_tool_calls: int
+    tool_calls_used: int
     status: Literal['approved', 'skip', 'feedback']
     access_token: Optional[str]
+    client_now_iso: Optional[str]
+    client_timezone: Optional[str]

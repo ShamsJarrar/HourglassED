@@ -24,6 +24,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with AIOMySQLSaver.from_conn_string(DATABASE_URL) as checkpointer:
+        await checkpointer.setup()
         app.state.graph = await get_graph(checkpointer)
         app.state.checkpointer = checkpointer
         

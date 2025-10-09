@@ -15,6 +15,7 @@ import EventModal from '../components/EventModal'
 import CreateEventModal from '../components/CreateEventModal'
 import FiltersModal from '../components/FiltersModal'
 import { parseJwt } from '../utils/jwt'
+import AgentModal from '../components/AgentModal'
 // CSS loaded via CDN in index.html to avoid import-analysis issues
 
 export default function Calendar() {
@@ -38,6 +39,7 @@ export default function Calendar() {
   const [createOpen, setCreateOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [filters, setFilters] = useState<{ owned_only?: boolean; event_types?: number[] | null }>({})
+  const [agentOpen, setAgentOpen] = useState(false)
 
   const viewOptions: { id: string; label: string }[] = [
     { id: 'multiMonthYear', label: 'Year' },
@@ -169,7 +171,10 @@ export default function Calendar() {
               <img src="/icons/filter_icon.svg" alt="Filters" className="h-4 w-4" />
               <span>Filters</span>
             </button>
-            <button className="w-10/12 self-center inline-flex items-center justify-center gap-3 rounded-xl bg-[#FAF0DC] text-[#633D00] font-medium px-4 py-3 transition-colors hover:bg-[#ead9be] border-1 border-[#633D00]">
+            <button
+              onClick={() => setAgentOpen(true)}
+              className="w-10/12 self-center inline-flex items-center justify-center gap-3 rounded-xl bg-[#FAF0DC] text-[#633D00] font-medium px-4 py-3 transition-colors hover:bg-[#ead9be] border-1 border-[#633D00]"
+            >
               <span>Organize with agent</span>
             </button>
           </aside>
@@ -242,6 +247,17 @@ export default function Calendar() {
           </section>
         </div>
       </main>
+      <AgentModal
+        open={agentOpen}
+        onClose={() => setAgentOpen(false)}
+        onCommitted={() => {
+          const api = calendarRef.current?.getApi()
+          if (api) {
+            const view = api.view
+            handleDatesSet({ start: view.activeStart, end: view.activeEnd })
+          }
+        }}
+      />
       <EventModal
         event={selected}
         isOwner={isOwner}

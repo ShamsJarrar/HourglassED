@@ -42,6 +42,29 @@ export interface EventResponse {
   timezone: string;
 }
 
+// Agent
+export type AgentRunState = 'user_feedback' | 'finished'
+
+export interface AgentInitialRequest {
+  user_input: string
+  max_tool_calls?: number
+  client_now_iso?: string
+  client_timezone?: string
+}
+
+export interface AgentResumeRequest {
+  thread_id: string
+  status: 'approved' | 'skip' | 'feedback'
+  user_feedback?: string | null
+}
+
+export interface AgentResponse<TProposal = any> {
+  thread_id: string
+  run_state: AgentRunState
+  answer: string
+  proposed_events?: TProposal[] | null
+}
+
 export interface EventUpdate {
   event_type?: string; // text class name per backend expectations
   header?: string | null;

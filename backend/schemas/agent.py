@@ -7,6 +7,8 @@ from agent.state import createSeriesWithEvents
 class InitialRequest(BaseModel):
     user_input: str
     max_tool_calls: Optional[int] = 4
+    client_now_iso: Optional[str] = None
+    client_timezone: Optional[str] = None
 
 
 class ResumeRequest(BaseModel):
